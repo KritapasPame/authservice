@@ -95,3 +95,36 @@ test('POST /users/invite with no token → 401', async () => {
   const res = await post({}, { tenantId: 1, email: 'nope@example.com', companyIds: [], roleSlugs: [] })
   expect(res.status).toBe(401)
 })
+
+test('tenant admin invites with a companyId belonging to another tenant → 400, no user row created', async () => {
+  const tenantId = await makeTenant('invite-crosstenant-own-' + Date.now())
+  const otherTenantId = await makeTenant('invite-crosstenant-other-' + Date.now())
+  const [otherCompany] = await db.insert(companies).values({ tenantId: otherTenantId, name: 'Victim Co' }).returning()
+
+  const auth = bearer({
+    sub: 'z4', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': tenantId,
+    'urn:platform:grants': { '1': { roles: ['group_admin'], permissions: ['tenant.user.manage'] } },
+  })
+  const email = 'cross-tenant-victim@example.com'
+  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [otherCompany.id], roleSlugs: [] })
+  expect(res.status).toBe(400)
+  const body = await res.json() as { invalidCompanies: number[] }
+  expect(body.invalidCompanies).toEqual([otherCompany.id])
+
+  const rows = await db.select().from(users).where(eq(users.email, email))
+  expect(rows.length).toBe(0)
+})
+
+test('duplicate companyIds in payload → single user_companies row', async () => {
+  const tenantId = await makeTenant('invite-dedupe-' + Date.now())
+  const [company] = await db.insert(companies).values({ tenantId, name: 'Dedupe Co' }).returning()
+
+  const auth = bearer({ sub: 'z5', 'urn:platform:role': 'superadmin' })
+  const res = await post({ authorization: auth }, { tenantId, email: 'dedupe-invite@example.com', companyIds: [company.id, company.id], roleSlugs: [] })
+  expect(res.status).toBe(200)
+  const body = await res.json() as { id: number }
+
+  const ucRows = await db.select().from(userCompanies).where(eq(userCompanies.userId, body.id))
+  expect(ucRows.length).toBe(1)
+  expect(ucRows[0].companyId).toBe(company.id)
+})

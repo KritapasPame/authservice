@@ -14,6 +14,7 @@ export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
       return await inviteUser(body)
     } catch (e: any) {
       if (e?.notFound) { set.status = 404; return `${e.notFound} not found` }
+      if (e?.invalidCompanies) { set.status = 400; return { invalidCompanies: e.invalidCompanies } }
       throw e
     }
   }, { body: t.Object({ tenantId: t.Number(), email: t.String({ format: 'email' }), companyIds: t.Array(t.Number()), roleSlugs: t.Array(t.String()) }) })
