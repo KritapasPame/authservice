@@ -1,0 +1,9 @@
+{
+  "name": "@platform/contracts",
+  "version": "1.0.0",
+  "description": "Shared type contracts for the platform",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
