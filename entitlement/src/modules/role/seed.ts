@@ -26,7 +26,9 @@ export async function seedSystemRoles() {
   const moduleByKey = new Map<string, number>()
   for (const m of MODULES) {
     const [existing] = await db.select().from(modules).where(eq(modules.key, m.key))
-    const row = existing ?? (await db.insert(modules).values(m).onConflictDoNothing().returning())[0]
+    const row = existing
+      ?? (await db.insert(modules).values(m).onConflictDoNothing().returning())[0]
+      ?? (await db.select().from(modules).where(eq(modules.key, m.key)))[0]!
     moduleByKey.set(m.key, row.id)
   }
 
