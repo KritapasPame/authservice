@@ -1,0 +1,1 @@
+{ "name": "authservice", "private": true, "workspaces": ["entitlement", "packages/*"] }
