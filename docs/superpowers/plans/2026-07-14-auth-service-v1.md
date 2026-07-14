@@ -1,6 +1,8 @@
 # Auth Service V1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **Rev 2 (2026-07-14, post-review):** แก้ `user_roles` เป็น serial PK + unique nulls-not-distinct (composite PK มี null ไม่ได้) · Elysia `derive({ as: 'scoped' })` + `throw status(401)` · seed module `core` + permission `tenant.*` และเปิด core อัตโนมัติตอนสร้าง tenant · bun workspaces + `@platform/contracts` · resolver เช็ค `users.status` · เพิ่ม helper `hasModule()`
 
 **Goal:** สร้าง Auth Service V1 = Zitadel (credential core) + Entitlement Service (Elysia) ที่ออก JWT พร้อม per-company grants ให้ระบบลูก (eSign) ใช้ร่วมกัน
 
@@ -84,6 +86,8 @@ authservice/
 - [ ] **Step 1: init project + deps**
 
 ```bash
+# root package.json — bun workspaces ให้ entitlement import @platform/contracts (T5) ได้
+echo '{ "name": "authservice", "private": true, "workspaces": ["entitlement", "packages/*"] }' > package.json
 cd entitlement && bun init -y
 bun add elysia drizzle-orm postgres jose
 bun add -d drizzle-kit @types/bun
@@ -215,7 +219,7 @@ git add docker-compose.yml .env.example zitadel && git commit -m "chore: docker 
 - [ ] **Step 1: `src/db/schema.ts`** (ตรงตาม spec §4/§4a — เก็บง่าย ใช้ serial PK)
 
 ```ts
-import { pgTable, serial, integer, text, boolean, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, serial, integer, text, boolean, unique, primaryKey } from 'drizzle-orm/pg-core'
 
 export const tenants = pgTable('tenants', {
   id: serial('id').primaryKey(),
@@ -279,10 +283,11 @@ export const rolePermissions = pgTable('role_permissions', {
 }, (t) => ({ pk: primaryKey({ columns: [t.roleId, t.permissionId] }) }))
 
 export const userRoles = pgTable('user_roles', {
+  id: serial('id').primaryKey(),  // PK แยก — companyId เป็น null ได้ (Postgres ห้าม null ใน composite PK)
   userId: integer('user_id').notNull().references(() => users.id),
   roleId: integer('role_id').notNull().references(() => roles.id),
   companyId: integer('company_id').references(() => companies.id), // null = ทุก company ใน tenant
-}, (t) => ({ pk: primaryKey({ columns: [t.userId, t.roleId, t.companyId] }) }))
+}, (t) => ({ uq: unique('user_roles_uq').on(t.userId, t.roleId, t.companyId).nullsNotDistinct() }))
 
 export const platformAdmins = pgTable('platform_admins', {
   zitadelUserId: text('zitadel_user_id').primaryKey(),  // superadmin (platform plane)
@@ -341,10 +346,13 @@ import { env } from '../config/env'
 
 const JWKS = createRemoteJWKSet(new URL(env.ZITADEL_JWKS_URL))
 
-export const requireAuth = new Elysia({ name: 'requireAuth' }).derive(async ({ headers, set }) => {
+// { as: 'scoped' } จำเป็น — derive ของ plugin เป็น local scope by default ใน Elysia 1.x
+// ถ้าไม่ใส่ route ที่ .use(requireAuth) จะไม่ได้ auth และ middleware ไม่รันเลย
+export const requireAuth = new Elysia({ name: 'requireAuth' }).derive({ as: 'scoped' }, async ({ headers, status }) => {
   const token = headers.authorization?.replace('Bearer ', '')
-  if (!token) { set.status = 401; throw new Error('unauthorized') }
-  const { payload } = await jwtVerify(token, JWKS, { issuer: env.ZITADEL_ISSUER, audience: env.ZITADEL_AUDIENCE })
+  const payload = token ? await jwtVerify(token, JWKS, { issuer: env.ZITADEL_ISSUER, audience: env.ZITADEL_AUDIENCE })
+    .then(r => r.payload, () => null) : null
+  if (!payload) throw status(401, 'unauthorized')  // ไม่มี token / verify fail / หมดอายุ → 401 (ไม่หลุดเป็น 500)
   return { auth: { sub: payload.sub as string, claims: payload as Record<string, any> } }
 })
 
@@ -354,6 +362,8 @@ export const getGrant = (c: Record<string, any>, companyId: number) =>
 export const can = (c: Record<string, any>, companyId: number, perm: string) => {
   const g = getGrant(c, companyId); return g.permissions.includes('*') || g.permissions.includes(perm)
 }
+// '*' จาก grant_all ไม่ถูกกรองด้วย module — service ปลายทางต้องเช็ค hasModule ควบคู่กับ can เสมอ
+export const hasModule = (c: Record<string, any>, key: string) => (c['urn:platform:modules'] ?? []).includes(key)
 ```
 
 - [ ] **Step 2: failing test `tests/auth.test.ts`** — no token → 401 (unit test `requireAuth` ผ่าน `app.handle`)
@@ -370,11 +380,11 @@ test('no token → 401', async () => {
 })
 ```
 
-- [ ] **Step 3: run — expect PASS** (โค้ดใน step 1 ทำให้ผ่าน) — ถ้า framework ต้อง tweak ให้ 401 return ให้แก้ให้ throw map เป็น 401
+- [ ] **Step 3: run — expect PASS** — `throw status(401)` ของ Elysia คืน 401 ตรง ๆ ไม่ต้อง map เพิ่ม; ถ้า test ได้ 200 แปลว่า derive ไม่รัน = ลืม `{ as: 'scoped' }`
 
 - [ ] **Step 4: commit** `feat(entitlement): JWT verify middleware + grant helpers`
 
-> 🔵 review-note: `can()` / `getGrant()` เป็นหัวใจ authz — review agent ต้องตรวจว่า service ลูกใช้ผ่าน helper นี้เท่านั้น ไม่ตีความ claims เอง
+> 🔵 review-note: `can()` / `getGrant()` เป็นหัวใจ authz — review agent ต้องตรวจว่า service ลูกใช้ผ่าน helper นี้เท่านั้น ไม่ตีความ claims เอง และต้องเช็ค `hasModule()` คู่กับ `can()` เสมอ (permissions `"*"` ไม่ถูกกรองด้วย module)
 
 ---
 
@@ -400,7 +410,9 @@ export type CreateCompanyInput = { tenantId: number; name: string; code?: string
 export type InviteUserInput = { tenantId: number; email: string; companyIds: number[]; roleSlugs: string[] }
 ```
 
-- [ ] **Step 2: commit** `feat(contracts): shared PlatformClaims + DTO types`
+- [ ] **Step 2: `packages/contracts/package.json`** — `{ "name": "@platform/contracts", "exports": { ".": "./src/index.ts" } }` แล้ว `bun install` ที่ root ให้ workspace link (Bun รัน .ts ตรงได้ ไม่ต้อง build)
+
+- [ ] **Step 3: commit** `feat(contracts): shared PlatformClaims + DTO types`
 
 ---
 
@@ -438,13 +450,17 @@ export const createZitadelUser = (orgId: string, email: string) =>
 
 ```ts
 import { db } from '../../db/client'
-import { tenants } from '../../db/schema'
+import { tenants, modules, tenantModules } from '../../db/schema'
 import { createZitadelOrg } from '../../zitadel/client'
-import type { CreateTenantInput } from '@contracts'
+import { eq } from 'drizzle-orm'
+import type { CreateTenantInput } from '@platform/contracts'
 
 export async function createTenant(input: CreateTenantInput) {
   const orgId = await createZitadelOrg(input.name)
   const [row] = await db.insert(tenants).values({ ...input, zitadelOrgId: orgId }).returning()
+  // เปิด module 'core' ให้ทุก tenant อัตโนมัติ — permission tenant.* (T8) เกาะ module นี้
+  const [core] = await db.select().from(modules).where(eq(modules.key, 'core'))
+  if (core) await db.insert(tenantModules).values({ tenantId: row.id, moduleId: core.id })
   return row
 }
 export const listTenants = () => db.select().from(tenants)
@@ -496,7 +512,7 @@ export const tenantRouter = new Elysia({ prefix: '/tenants' }).use(requireAuth)
 - Consumes: `db`, `roles,permissions,rolePermissions`
 - Produces: CRUD role (มี `grantAll`), assign permission→role; `seedSystemRoles()` สร้าง `group_admin`(grantAll), `company_admin`(grantAll) เป็น system role (tenantId null)
 
-- [ ] **Step 1: `seed.ts`** — `seedSystemRoles()` upsert group_admin/company_admin (grantAll true) + seed permission ตัวอย่าง (`employee.read`, `employee.write`, `esign.document.sign`) ผูก module
+- [ ] **Step 1: `seed.ts`** — `seedSystemRoles()` upsert group_admin/company_admin (grantAll true) + seed modules `core`/`hr`/`esign` + permissions ผูก module: `tenant.company.manage`, `tenant.user.manage` → **core** · `employee.read`, `employee.write` → hr · `esign.document.sign` → esign (guard ใน T7/T10 อ้าง permission core พวกนี้ — ถ้าไม่ seed role ที่ไม่ใช่ grant_all จะทำ management ไม่ได้เลย)
 - [ ] **Step 2: `service.ts`** — createRole, assignPermission, listRoles
 - [ ] **Step 3: `route.ts`** — guard superadmin/group_admin
 - [ ] **Step 4: failing test → implement → pass** — ทดสอบ grantAll role ถูก mark; assign permission ได้
@@ -537,7 +553,7 @@ import { db } from '../../db/client'
 import { users, userCompanies, userRoles, roles, tenants } from '../../db/schema'
 import { createZitadelUser } from '../../zitadel/client'
 import { eq, inArray } from 'drizzle-orm'
-import type { InviteUserInput } from '@contracts'
+import type { InviteUserInput } from '@platform/contracts'
 
 export async function inviteUser(i: InviteUserInput) {
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, i.tenantId))
@@ -574,13 +590,13 @@ export async function inviteUser(i: InviteUserInput) {
 import { db } from '../db/client'
 import { users, userCompanies, userRoles, roles, rolePermissions, permissions, platformAdmins, modules, tenantModules } from '../db/schema'
 import { eq, inArray, and } from 'drizzle-orm'
-import type { PlatformClaims, Grant } from '@contracts'
+import type { PlatformClaims, Grant } from '@platform/contracts'
 
 export async function resolveClaims(zid: string): Promise<PlatformClaims> {
   const [admin] = await db.select().from(platformAdmins).where(eq(platformAdmins.zitadelUserId, zid))
   if (admin) return { role: 'superadmin' }
   const [u] = await db.select().from(users).where(eq(users.zitadelUserId, zid))
-  if (!u) return {}
+  if (!u || u.status !== 'active') return {}  // user ถูก disable → ไม่มีสิทธิ์ เหมือนยังไม่ provision
 
   const enabled = await db.select({ id: modules.id, key: modules.key }).from(tenantModules)
     .innerJoin(modules, eq(tenantModules.moduleId, modules.id))
@@ -622,7 +638,7 @@ export const claimsRouter = new Elysia({ prefix: '/internal' })
   }, { body: t.Object({ zitadelUserId: t.String() }) })
 ```
 
-- [ ] **Step 3: failing test `tests/claims.test.ts`** — เคส spec: user admin ที่ company A, hr_staff ที่ B → `grants["A"].permissions=['*']`, `grants["B"]` มีแค่ hr; superadmin → `{role:'superadmin'}`; unknown → `{}`; ปิด module → permission ของ module นั้นหลุด. **run FAIL → implement → run PASS**
+- [ ] **Step 3: failing test `tests/claims.test.ts`** — เคส spec: user admin ที่ company A, hr_staff ที่ B → `grants["A"].permissions=['*']`, `grants["B"]` มีแค่ hr; superadmin → `{role:'superadmin'}`; unknown/`status != 'active'` → `{}`; ปิด module → permission ของ module นั้นหลุด. **run FAIL → implement → run PASS**
 - [ ] **Step 4: commit** `feat(entitlement): claims resolver + internal endpoint`
 
 > 🔵 review-note: task นี้ + T4 คือจุดที่ review agent ต้องเพ่งที่สุด (per-company scope leak, module filter, superadmin bypass, shared-secret timing)
