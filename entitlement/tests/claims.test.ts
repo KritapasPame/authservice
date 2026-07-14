@@ -89,7 +89,7 @@ test('Somchai scenario: grantAll role scoped to company A, custom hr role scoped
   expect(claims.grants[String(companyB)]!.permissions).not.toContain('esign.document.sign')
 
   // cross-company leak check: company A must not pick up the hr_staff role slug, company B must not get '*'
-  expect(claims.grants[String(companyA)]!.roles).not.toContain('hr_staff')
+  expect(claims.grants[String(companyA)]!.roles.some(r => r.startsWith('hr_staff'))).toBe(false)
   expect(claims.grants[String(companyB)]!.roles).toEqual(expect.arrayContaining([expect.stringContaining('hr_staff')]))
 })
 
