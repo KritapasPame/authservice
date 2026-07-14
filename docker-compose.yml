@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: ["5432:5432"]
+    volumes:
+      - ./.data/pg:/var/lib/postgresql/data
+      - ./zitadel/initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    # provisioned for future use only — no code uses it in V1
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.16.0
+    command: 'start-from-init --masterkeyFromEnv --tlsMode disabled'
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: db
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${POSTGRES_USER}
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${POSTGRES_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${POSTGRES_USER}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
+      ZITADEL_MASTERKEY: ${ZITADEL_MASTERKEY}
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_EXTERNALDOMAIN}
+      # v4 defaults new instances to Login V2 (separate Next.js container + reverse proxy).
+      # We stay on the bundled legacy login UI (served at :8080/ui/login) to keep this
+      # compose file to the brief's 3 services — no Traefik, no extra login container.
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["8080:8080"]
