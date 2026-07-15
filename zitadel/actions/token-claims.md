@@ -306,7 +306,7 @@ Console → project → your application → Token Settings → **Access Token T
 ## 6. End-to-end verification procedure
 
 1. `docker compose up -d db zitadel` (+ entitlement running with the §3 adapter
-   route mounted and `ZITADEL_TARGET_SIGNING_KEY` set).
+   route mounted and `ZITADEL_ACTIONS_SIGNING_KEY` set).
 2. Console one-time setup per `zitadel/docker-init.md` (admin login, service user
    + PAT with instance action permissions, project + Web app with PKCE, **Access
    Token Type = JWT**), then §5.1 + §5.2 above.
