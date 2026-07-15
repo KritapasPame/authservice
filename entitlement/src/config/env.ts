@@ -8,4 +8,5 @@ export const env = {
   ZITADEL_MGMT_URL: process.env.ZITADEL_MGMT_URL ?? '',
   ZITADEL_MGMT_TOKEN: process.env.ZITADEL_MGMT_TOKEN ?? '', // service user PAT
   CLAIMS_SHARED_SECRET: need('CLAIMS_SHARED_SECRET'),
+  ZITADEL_ACTIONS_SIGNING_KEY: process.env.ZITADEL_ACTIONS_SIGNING_KEY ?? '', // Actions v2 target signingKey, see zitadel/actions/token-claims.md §3
 }

@@ -125,11 +125,13 @@ So the existing `POST /internal/claims` + `x-claims-secret` endpoint **cannot be
 called by Zitadel directly** — neither its auth header nor its request/response
 shapes match. The design consequence:
 
-> **Add a thin adapter route in the Entitlement Service** (follow-up impl task —
-> NOT yet in the codebase): `POST /internal/zitadel/token-claims`. It authenticates
-> the call via Zitadel's built-in HMAC signature instead of `x-claims-secret`,
-> extracts `user.id`, reuses `resolveClaims()`, and answers in
-> `ContextInfoResponse` shape.
+> **Implemented** (Task 12b): a thin adapter route in the Entitlement Service,
+> `entitlement/src/claims/zitadel-route.ts` (`zitadelClaimsRouter`), serving
+> `POST /internal/zitadel/token-claims`. It authenticates the call via Zitadel's
+> built-in HMAC signature instead of `x-claims-secret`, extracts `user.id`, reuses
+> `resolveClaims()`, and answers in `ContextInfoResponse` shape. Not yet mounted
+> in `entitlement/src/http/app.ts` (main-session concern, per that file's
+> comment) and not yet wired to a live Zitadel instance — see §6/§7.
 
 ### Authentication options, ranked
 
@@ -140,8 +142,9 @@ shapes match. The design consequence:
    [`pkg/actions/signing.go`](https://github.com/zitadel/zitadel/blob/v4.16.0/pkg/actions/signing.go)
    (`SigningHeader = "ZITADEL-Signature"`, `ComputeSignatureHeader`,
    `ValidatePayload`). The per-target `signingKey` is returned **once** by
-   CreateTarget — store it as e.g. `ZITADEL_TARGET_SIGNING_KEY` in the
-   entitlement env. This is strictly stronger than a static header (keyed to the
+   CreateTarget — store it as `ZITADEL_ACTIONS_SIGNING_KEY` in the entitlement
+   env (optional/empty by default — the adapter fails closed with 401 when
+   unset). This is strictly stronger than a static header (keyed to the
    body + timestamped).
 2. *Fallback:* secret as query param — the endpoint is a free-form URL, so
    `http://entitlement:3000/internal/zitadel/token-claims?secret=...` works.
@@ -150,15 +153,18 @@ shapes match. The design consequence:
 3. *Defense in depth (always):* keep the route reachable only on the compose
    network; never publish it.
 
-Adapter sketch (reference; keep it this small):
+Adapter sketch (this is what shipped, kept close to the original sketch —
+see `entitlement/src/claims/zitadel-route.ts` for the real, tested file):
 
 ```ts
-// entitlement/src/claims/zitadel-webhook.ts  (follow-up task)
+// entitlement/src/claims/zitadel-route.ts
 import { Elysia } from 'elysia'
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { env } from '../config/env'
 import { resolveClaims } from './resolver'
 
-function validSignature(header: string | undefined, raw: string, key: string) {
+function validSignature(header: string | null, raw: string, key: string) {
+  if (!key) return false // fail-closed: signing key not configured
   const t = header?.match(/t=(\d+)/)?.[1], v1 = header?.match(/v1=([0-9a-f]+)/)?.[1]
   if (!t || !v1 || Math.abs(Date.now() / 1000 - Number(t)) > 300) return false
   const mac = createHmac('sha256', key).update(`${t}.${raw}`).digest()
@@ -166,10 +172,11 @@ function validSignature(header: string | undefined, raw: string, key: string) {
   return got.length === mac.length && timingSafeEqual(mac, got)
 }
 
-export const zitadelWebhook = new Elysia().post('/internal/zitadel/token-claims', async ({ request, set }) => {
+export const zitadelClaimsRouter = new Elysia({ prefix: '/internal/zitadel' }).post('/token-claims', async ({ request, set }) => {
   const raw = await request.text()
-  if (!validSignature(request.headers.get('zitadel-signature') ?? undefined, raw, process.env.ZITADEL_TARGET_SIGNING_KEY!)) { set.status = 401; return 'no' }
-  const claims = await resolveClaims(JSON.parse(raw).user.id)
+  if (!validSignature(request.headers.get('ZITADEL-Signature'), raw, env.ZITADEL_ACTIONS_SIGNING_KEY)) { set.status = 401; return 'no' }
+  const payload = JSON.parse(raw) as { user?: { id?: string } }
+  const claims = payload.user?.id ? await resolveClaims(payload.user.id) : {}
   if ('role' in claims) return { append_claims: [{ key: 'urn:platform:role', value: claims.role }] }
   if (!('tenantId' in claims)) return {}
   return { append_claims: Object.entries(claims).map(([k, v]) => ({ key: `urn:platform:${k}`, value: v })) }
@@ -264,7 +271,7 @@ containerized — update the target via UpdateTarget or re-create it.)
   unprovisioned user legitimately gets `{}` (that is not an error), so the only
   thing `true` blocks is real outages. This only affects apps with JWT access
   tokens; the Console app uses the default opaque type and keeps working.
-- Save `signingKey` → entitlement env `ZITADEL_TARGET_SIGNING_KEY`. It is shown
+- Save `signingKey` → entitlement env `ZITADEL_ACTIONS_SIGNING_KEY`. It is shown
   only in this response.
 
 ### 5.2 Bind it to the `preaccesstoken` function
@@ -353,7 +360,12 @@ checks only):
 Not verified live (requires PAT/console/browser — listed as MANUAL VERIFY above):
 authenticated target/execution creation, deny-list rejection + override, console
 wording, JWT token-type setting, real login + decoded token. The §3 adapter route
-is a documented follow-up implementation, not yet in the codebase.
+is now implemented (`entitlement/src/claims/zitadel-route.ts`,
+`tests/zitadel-claims.test.ts` — signature verification, superadmin, tenant-claims
+round-trip, and unprovisioned-user cases all exercised against the real DB with a
+synthetically computed `ZITADEL-Signature`), but has not yet been called by a
+live Zitadel instance end-to-end (still MANUAL VERIFY, and not yet mounted in
+`entitlement/src/http/app.ts`).
 
 ## Sources
 
