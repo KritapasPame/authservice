@@ -63,6 +63,31 @@ service อิสระ **ไม่ผูกกับ Laravel HR** — เพื
   ของ user ต่อลูกค้า + รองรับ org-level SSO/branding ตอนขายองค์กร
 - **User ≠ Employee** ยังคงเดิม — Employee เป็น profile ใน HR ที่ผูกกับ user (via `zitadel_user_id`)
 
+### 3a. สินค้าใหม่: Zitadel Project / Application / Organization access
+
+อย่าปน resource 3 ระดับนี้:
+
+- **Organization** = identity boundary ของ tenant ลูกค้า (user, login policy, branding)
+- **Project** = product/security boundary เช่น `EDM eSign`, `EDM HR`
+- **Application** = OIDC client ของ product เดิม เช่น Web, Mobile, Admin หรือ environment แยก
+
+สินค้าใหม่ที่มี security lifecycle/audience แยกควรสร้าง **Project ใหม่**; ถ้าเป็นเพียง client
+อีกชนิดของสินค้าเดิม (เช่น eSign Mobile เพิ่มจาก eSign Web) ให้สร้าง Application ใต้ Project เดิม.
+Project/Application เป็นของ platform org กลาง ไม่ต้องสร้างซ้ำต่อ tenant.
+
+การสร้าง Application ไม่ได้ทำให้ทุก Organization ใช้ Project ได้โดยอัตโนมัติเสมอ:
+
+1. **V1 (เลือกใช้):** ปิด Zitadel setting **Check for Project on Authentication** เพื่อให้ user
+   จากทุก org ผ่าน authentication ได้ แล้วให้ Entitlement เป็น source of truth ว่า tenant ซื้อ
+   module ใด (`tenant_modules`) และ API บังคับ `modules`/`permissions` จาก JWT; user ที่ไม่มี
+   entitlement login สำเร็จได้แต่ API ต้องตอบ 403.
+2. **Future defense-in-depth:** เปิด setting ดังกล่าว แล้วสร้าง **Project Grant** ให้แต่ละ
+   Organization เมื่อซื้อ module; ตอนยกเลิกให้ถอน Grant ควบคู่กับปิด `tenant_modules`.
+
+V1 ยังไม่มี Project Grant automation และต้องไม่ใช้ Zitadel project roles เป็น source of truth
+ซ้ำกับ Entitlement เพราะจะเกิดสิทธิ์สองชุดที่ drift กัน. หากเพิ่ม automation ภายหลัง ให้
+`tenant_modules` เป็นต้นทางและ Project Grant เป็น projection เท่านั้น.
+
 ## 4. Data model — Entitlement Service (Postgres, DB แยกจาก Zitadel)
 
 ```

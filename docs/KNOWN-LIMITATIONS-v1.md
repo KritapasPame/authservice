@@ -25,6 +25,10 @@
   ดู `.superpowers/sdd/` reports; ควรรวมเป็น operator doc เดียวตอน containerize
 - Zitadel Action e2e (สร้าง PAT/OIDC app/target + login จริง + decode token) = **MANUAL VERIFY**
   ทั้งหมด ยังไม่ทดสอบกับ instance จริง (ดู token-claims.md §6/§7)
+- V1 **ยังไม่มี Zitadel Project Grant automation**: shared product projects ต้องปิด
+  **Check for Project on Authentication** และให้ `tenant_modules` + JWT claims คุม product
+  access. Future defense-in-depth ค่อย sync ซื้อ/ยกเลิก module → create/revoke Project Grant
+  โดยให้ Entitlement เป็น source of truth เพียงชุดเดียว (ดู design spec §3a).
 
 ## eSign integration (client ตัวแรก) — สิ่งที่จะเจอทันที
 - `getGrant`/`can`/`hasModule` + `requireAuth` อยู่ใน `entitlement/src/http/auth.ts` แต่

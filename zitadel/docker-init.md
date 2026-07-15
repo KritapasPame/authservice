@@ -34,6 +34,11 @@ containers or reverse proxy.
      vs. other flows may differ from v3 screenshots online).
    - Configure redirect URIs / post-logout URIs for whichever client
      (Next.js / eSign) will use this app.
+   - For V1, disable the project setting **Check for Project on Authentication**.
+     Customer organizations are authenticated by this shared platform project;
+     `tenant_modules` and the JWT module/permission claims remain the source of
+     truth for product access. If this check is enabled, every customer org needs
+     an explicit Zitadel Project Grant before its users can authenticate.
    - After creation, the app detail page shows a **Client ID** — use that
      as `ZITADEL_AUDIENCE` (Zitadel access tokens carry the project/client
      id as `aud`; **verify in console**: confirm whether the value to copy
