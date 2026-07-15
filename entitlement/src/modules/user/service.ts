@@ -1,10 +1,11 @@
 import { db } from '../../db/client'
 import { users, userCompanies, userRoles, roles, tenants, companies } from '../../db/schema'
 import { createZitadelUser } from '../../zitadel/client'
+import { isSuperadmin } from '../../http/auth'
 import { eq, inArray, isNull, or, and } from 'drizzle-orm'
 import type { InviteUserInput } from '@platform/contracts'
 
-export async function inviteUser(i: InviteUserInput) {
+export async function inviteUser(i: InviteUserInput, callerClaims: Record<string, any>) {
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, i.tenantId))
   if (!tenant) throw { notFound: 'tenant' }
   // dedupe + validate companyIds จริงๆ เป็นของ tenant นี้ — กัน tenant-A admin ยัด company ของ tenant-B
@@ -17,13 +18,21 @@ export async function inviteUser(i: InviteUserInput) {
       throw { invalidCompanies: companyIds.filter(id => !ownedIds.has(id)) }
     }
   }
-  const zid = await createZitadelUser(tenant.zitadelOrgId, i.email)
-  const [u] = await db.insert(users).values({ zitadelUserId: zid, tenantId: i.tenantId, email: i.email }).returning()
-  if (companyIds.length) await db.insert(userCompanies).values(companyIds.map(companyId => ({ userId: u.id, companyId })))
   // slug อาจชนกับ system role (tenantId null) หรือ role ของ tenant อื่นที่ใช้ slug ซ้ำ — จำกัดแค่ system role + role ของ tenant นี้เอง
+  // validate ก่อนสร้าง zitadel user/DB rows เหมือน companyIds ด้านบน — กัน orphan
   const rs = i.roleSlugs.length
     ? await db.select().from(roles).where(and(inArray(roles.slug, i.roleSlugs), or(isNull(roles.tenantId), eq(roles.tenantId, i.tenantId))))
     : []
+  // privilege-escalation guard: attaching a grantAll role ('*' access) requires the caller to already hold '*' (or be superadmin)
+  const escalating = rs.filter(r => r.grantAll)
+  if (escalating.length) {
+    const callerHasStar = callerClaims['urn:platform:tenantId'] === i.tenantId &&
+      Object.values(callerClaims['urn:platform:grants'] ?? {}).some((g: any) => g.permissions.includes('*'))
+    if (!isSuperadmin(callerClaims) && !callerHasStar) throw { forbiddenRole: escalating.map(r => r.slug) }
+  }
+  const zid = await createZitadelUser(tenant.zitadelOrgId, i.email)
+  const [u] = await db.insert(users).values({ zitadelUserId: zid, tenantId: i.tenantId, email: i.email }).returning()
+  if (companyIds.length) await db.insert(userCompanies).values(companyIds.map(companyId => ({ userId: u.id, companyId })))
   if (rs.length) await db.insert(userRoles).values(rs.map(r => ({ userId: u.id, roleId: r.id, companyId: null })))
   return u
 }

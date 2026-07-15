@@ -1,4 +1,4 @@
-import { eq, isNull, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { modules, permissions, roles } from '../../db/schema'
 
@@ -38,7 +38,8 @@ export async function seedSystemRoles() {
   }
 
   for (const r of SYSTEM_ROLES) {
-    const [existing] = await db.select().from(roles).where(and(eq(roles.slug, r.slug), isNull(roles.tenantId)))
-    if (!existing) await db.insert(roles).values({ slug: r.slug, name: r.name, tenantId: null, grantAll: true })
+    // onConflictDoNothing on roles_tenant_slug_uq (S4) — safe under concurrent seed calls, not just check-then-insert
+    await db.insert(roles).values({ slug: r.slug, name: r.name, tenantId: null, grantAll: true })
+      .onConflictDoNothing({ target: [roles.tenantId, roles.slug] })
   }
 }

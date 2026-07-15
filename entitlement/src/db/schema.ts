@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, unique, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, serial, integer, text, boolean, unique, primaryKey, index } from 'drizzle-orm/pg-core'
 
 export const tenants = pgTable('tenants', {
   id: serial('id').primaryKey(),
@@ -15,7 +15,7 @@ export const companies = pgTable('companies', {
   code: text('code'),
   parentCompanyId: integer('parent_company_id'),
   status: text('status').notNull().default('active'),
-})
+}, (t) => ({ tenantIdx: index('companies_tenant_id_idx').on(t.tenantId) }))
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -48,7 +48,10 @@ export const roles = pgTable('roles', {
   name: text('name').notNull(),
   slug: text('slug').notNull(),
   grantAll: boolean('grant_all').notNull().default(false),
-})
+}, (t) => ({
+  slugUq: unique('roles_tenant_slug_uq').on(t.tenantId, t.slug).nullsNotDistinct(),
+  tenantIdx: index('roles_tenant_id_idx').on(t.tenantId),
+}))
 
 export const permissions = pgTable('permissions', {
   id: serial('id').primaryKey(),

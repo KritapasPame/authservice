@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { bearer } from './helpers/auth-mock'
 import { db } from '../src/db/client'
 import { tenants, companies, roles, users, userCompanies, userRoles } from '../src/db/schema'
+const { seedSystemRoles } = await import('../src/modules/role/seed')
 
 // mock zitadel client — ไม่ยิง network จริง (mock.module เป็น process-global — ต้อง mock ทุก export ของโมดูล
 // (createZitadelOrg, createZitadelUser, listLoginEvents) ไม่งั้น tenant.test.ts / admin.test.ts ที่ import
@@ -115,6 +116,41 @@ test('tenant admin invites with a companyId belonging to another tenant → 400,
 
   const rows = await db.select().from(users).where(eq(users.email, email))
   expect(rows.length).toBe(0)
+})
+
+test('S1: caller with only tenant.user.manage (no *) inviting a grantAll role → 403, no user row created', async () => {
+  await seedSystemRoles()
+  const tenantId = await makeTenant('invite-escalate-' + Date.now())
+  const auth = bearer({
+    sub: 'z6', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': tenantId,
+    'urn:platform:grants': { '1': { roles: [], permissions: ['tenant.user.manage'] } },
+  })
+  const email = 'escalate-victim@example.com'
+  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [], roleSlugs: ['group_admin'] })
+  expect(res.status).toBe(403)
+  const body = await res.json() as { forbiddenRole: string[] }
+  expect(body.forbiddenRole).toEqual(['group_admin'])
+
+  const rows = await db.select().from(users).where(eq(users.email, email))
+  expect(rows.length).toBe(0)
+})
+
+test('S1: caller with a * grant CAN invite a grantAll role → 200, role attached', async () => {
+  await seedSystemRoles()
+  const tenantId = await makeTenant('invite-star-' + Date.now())
+  const auth = bearer({
+    sub: 'z7', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': tenantId,
+    'urn:platform:grants': { '1': { roles: ['group_admin'], permissions: ['*'] } },
+  })
+  const email = 'star-invite@example.com'
+  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [], roleSlugs: ['group_admin'] })
+  expect(res.status).toBe(200)
+  const body = await res.json() as { id: number }
+
+  const [groupAdmin] = await db.select().from(roles).where(eq(roles.slug, 'group_admin'))
+  const urRows = await db.select().from(userRoles).where(eq(userRoles.userId, body.id))
+  expect(urRows.length).toBe(1)
+  expect(urRows[0].roleId).toBe(groupAdmin!.id)
 })
 
 test('duplicate companyIds in payload → single user_companies row', async () => {

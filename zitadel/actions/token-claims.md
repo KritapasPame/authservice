@@ -129,9 +129,9 @@ shapes match. The design consequence:
 > `entitlement/src/claims/zitadel-route.ts` (`zitadelClaimsRouter`), serving
 > `POST /internal/zitadel/token-claims`. It authenticates the call via Zitadel's
 > built-in HMAC signature instead of `x-claims-secret`, extracts `user.id`, reuses
-> `resolveClaims()`, and answers in `ContextInfoResponse` shape. Not yet mounted
-> in `entitlement/src/http/app.ts` (main-session concern, per that file's
-> comment) and not yet wired to a live Zitadel instance — see §6/§7.
+> `resolveClaims()`, and answers in `ContextInfoResponse` shape. It **is mounted**
+> in `entitlement/src/http/app.ts` (`createApp()`), but is not yet wired to a
+> live Zitadel instance — see §6/§7.
 
 ### Authentication options, ranked
 
@@ -363,9 +363,9 @@ wording, JWT token-type setting, real login + decoded token. The §3 adapter rou
 is now implemented (`entitlement/src/claims/zitadel-route.ts`,
 `tests/zitadel-claims.test.ts` — signature verification, superadmin, tenant-claims
 round-trip, and unprovisioned-user cases all exercised against the real DB with a
-synthetically computed `ZITADEL-Signature`), but has not yet been called by a
-live Zitadel instance end-to-end (still MANUAL VERIFY, and not yet mounted in
-`entitlement/src/http/app.ts`).
+synthetically computed `ZITADEL-Signature`) and **is mounted** in
+`entitlement/src/http/app.ts`, but has not yet been called by a live Zitadel
+instance end-to-end (still MANUAL VERIFY).
 
 ## Sources
 

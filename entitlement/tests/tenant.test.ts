@@ -6,8 +6,9 @@ import { bearer } from './helpers/auth-mock'
 // mock.module เป็น process-global — ต้อง mock ทุก export ของโมดูล (รวม listLoginEvents ที่ admin.test.ts ใช้)
 // ไม่งั้น admin.test.ts ที่ import โมดูลเดียวกันในโปรเซสเดียวกันจะพัง (SyntaxError: export not found)
 const orgId = 'org_mock_' + Date.now()
+const createZitadelOrgMock = mock(async (_name: string) => orgId)
 mock.module('../src/zitadel/client', () => ({
-  createZitadelOrg: mock(async (_name: string) => orgId),
+  createZitadelOrg: createZitadelOrgMock,
   createZitadelUser: mock(async () => 'user_mock'),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
@@ -39,4 +40,23 @@ test('POST /tenants as non-superadmin → 403', async () => {
 test('POST /tenants with no token → 401', async () => {
   const res = await post({}, { name: 'Nope', slug: 'nope2-' + Date.now() })
   expect(res.status).toBe(401)
+})
+
+test('S2: unexpected zitadel client error never leaks upstream text — 500 { error: "internal" }', async () => {
+  // mockImplementationOnce — mirrors the real zitadel/client.ts Error shape ("zitadel <path> <status> <body>")
+  createZitadelOrgMock.mockImplementationOnce(async () => {
+    throw new Error('zitadel /v2/organizations 500 {"secret":"upstream detail that must never reach the client"}')
+  })
+  const { createApp } = await import('../src/http/app')
+  const app = createApp()
+  const auth = bearer({ sub: 'z-onerror', 'urn:platform:role': 'superadmin' })
+  const res = await app.handle(new Request('http://localhost/tenants', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: auth },
+    body: JSON.stringify({ name: 'Boom Co', slug: 'boom-' + Date.now() }),
+  }))
+  expect(res.status).toBe(500)
+  const body = await res.json()
+  expect(body).toEqual({ error: 'internal' })
+  expect(JSON.stringify(body)).not.toContain('upstream detail')
 })

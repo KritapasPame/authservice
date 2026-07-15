@@ -9,9 +9,14 @@ const canManageTenant = (claims: Record<string, any>, tenantId: number) =>
     Object.values(claims['urn:platform:grants'] ?? {}).some((g: any) => g.permissions.includes('*') || g.permissions.includes('tenant.company.manage')))
 
 export const companyRouter = new Elysia({ prefix: '/companies' }).use(requireAuth)
-  .post('/', ({ auth, body, set }) => {
+  .post('/', async ({ auth, body, set }) => {
     if (!canManageTenant(auth.claims, body.tenantId)) { set.status = 403; return 'forbidden' }
-    return createCompany(body)
+    try {
+      return await createCompany(body)
+    } catch (e: any) {
+      if (e?.invalidParent !== undefined) { set.status = 400; return { invalidParent: e.invalidParent } }
+      throw e
+    }
   }, { body: t.Object({ tenantId: t.Number(), name: t.String(), code: t.Optional(t.String()), parentCompanyId: t.Optional(t.Number()) }) })
   .get('/:tenantId', ({ auth, params, set }) => {
     const tenantId = Number(params.tenantId)

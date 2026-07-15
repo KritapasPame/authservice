@@ -42,6 +42,19 @@ test('POST /companies with parentCompanyId stores parent id', async () => {
   expect(child.parentCompanyId).toBe(parent.id)
 })
 
+test('S5: parentCompanyId belonging to another tenant → 400, company not created', async () => {
+  const tenantId = await makeTenant('parent-own-' + Date.now())
+  const otherTenantId = await makeTenant('parent-other-' + Date.now())
+  const auth = bearer({ sub: 'z1', 'urn:platform:role': 'superadmin' })
+  const otherParentRes = await post({ authorization: auth }, { tenantId: otherTenantId, name: 'Other Tenant Parent' })
+  const otherParent = await otherParentRes.json() as { id: number }
+
+  const res = await post({ authorization: auth }, { tenantId, name: 'Should Not Create', parentCompanyId: otherParent.id })
+  expect(res.status).toBe(400)
+  const body = await res.json() as { invalidParent: number }
+  expect(body.invalidParent).toBe(otherParent.id)
+})
+
 test('POST /companies as tenant user with tenant.company.manage grant creates in own tenant', async () => {
   const tenantId = await makeTenant('grant-' + Date.now())
   const auth = bearer({
