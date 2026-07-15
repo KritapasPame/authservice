@@ -3,10 +3,13 @@ import { Elysia } from 'elysia'
 import { bearer } from './helpers/auth-mock'
 
 // mock zitadel client — ไม่ยิง network จริง ทดสอบ createTenant กับ DB จริง
+// mock.module เป็น process-global — ต้อง mock ทุก export ของโมดูล (รวม listLoginEvents ที่ admin.test.ts ใช้)
+// ไม่งั้น admin.test.ts ที่ import โมดูลเดียวกันในโปรเซสเดียวกันจะพัง (SyntaxError: export not found)
 const orgId = 'org_mock_' + Date.now()
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async (_name: string) => orgId),
   createZitadelUser: mock(async () => 'user_mock'),
+  listLoginEvents: mock(async () => ({ events: [] })),
 }))
 
 const { tenantRouter } = await import('../src/modules/tenant/route')

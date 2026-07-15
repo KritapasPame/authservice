@@ -5,13 +5,15 @@ import { bearer } from './helpers/auth-mock'
 import { db } from '../src/db/client'
 import { tenants, companies, roles, users, userCompanies, userRoles } from '../src/db/schema'
 
-// mock zitadel client — ไม่ยิง network จริง (mock.module เป็น process-global — ต้อง mock ทั้ง createZitadelOrg และ
-// createZitadelUser ไม่งั้น tenant.test.ts ที่ import ไฟล์เดียวกันจะพัง)
+// mock zitadel client — ไม่ยิง network จริง (mock.module เป็น process-global — ต้อง mock ทุก export ของโมดูล
+// (createZitadelOrg, createZitadelUser, listLoginEvents) ไม่งั้น tenant.test.ts / admin.test.ts ที่ import
+// ไฟล์เดียวกันในโปรเซสเดียวกันจะพัง)
 // zitadelUserId ต้อง unique ต่อ call — users.zitadelUserId มี unique constraint และ test นี้ invite หลายคน
 let zitadelUserCounter = 0
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async (_name: string) => 'org_mock_' + Date.now()),
   createZitadelUser: mock(async () => `user_mock_${Date.now()}_${++zitadelUserCounter}`),
+  listLoginEvents: mock(async () => ({ events: [] })),
 }))
 
 const { userRouter } = await import('../src/modules/user/route')

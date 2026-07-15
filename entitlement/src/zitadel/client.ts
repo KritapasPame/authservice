@@ -9,3 +9,8 @@ export const createZitadelOrg = (name: string) => call('/v2/organizations', { na
 export const createZitadelUser = (orgId: string, email: string) =>
   call('/v2/users/human', { organization: { orgId }, email: { email, isVerified: false }, username: email })
     .then((r: any) => r.userId)
+
+// events search (Admin API) — POST {mgmt}/admin/v1/events/_search, requires IAM_OWNER_VIEWER/IAM_OWNER role on the PAT.
+// 'user.token.added' = access token issued on a successful login/authentication.
+// https://zitadel.com/docs/guides/integrate/zitadel-apis/event-api
+export const listLoginEvents = () => call('/admin/v1/events/_search', { eventTypes: ['user.token.added'], limit: 100, asc: false })
