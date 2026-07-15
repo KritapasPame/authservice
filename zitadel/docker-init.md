@@ -3,8 +3,9 @@
 One-time manual steps after `docker compose up -d db zitadel` comes up healthy.
 This project pins Zitadel to `v4.16.0` and runs the bundled **legacy login UI
 v1** (`ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED=false`), not the new
-Login V2 Next.js app — so everything below happens under `:8080`, no extra
-containers or reverse proxy.
+Login V2 Next.js app. The URLs below describe local development on `:8080`;
+the verified Cloudflare + nginx pre-test deployment and its HTTPS settings are
+documented in `docs/PRETEST-AUTH-DEPLOYMENT.md`.
 
 1. `docker compose up -d db zitadel`, wait for `curl -sf localhost:8080/debug/healthz` to return `ok`.
 2. Open the console: `http://localhost:8080/ui/console`.
@@ -65,6 +66,7 @@ containers or reverse proxy.
   `/ui/console/` when hit without an active OIDC auth request, which is
   expected — you'll only see the real login form when a client redirects
   a user in via a proper `/oauth/v2/authorize` request).
-- Steps 2-5 above (exact console labels/menus) were **not** click-verified
-  in a browser this session — only the HTTP surface was checked via curl.
-  Verify the console wording before relying on the exact wording above.
+- Bootstrap admin login, OIDC Web app creation, Authorization Code + PKCE and
+  JWT access-token issuance were browser-verified on pre-test on 2026-07-15.
+- Service-user PAT permissions, token lifetime menu wording and Actions v2
+  custom-claims flow still require manual end-to-end verification.

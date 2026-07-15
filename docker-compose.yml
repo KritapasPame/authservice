@@ -21,8 +21,7 @@ services:
 
   zitadel:
     image: ghcr.io/zitadel/zitadel:v4.16.0
-    # disabled = local HTTP | external = TLS terminated upstream (Cloudflare/nginx)
-    command: 'start-from-init --masterkeyFromEnv --tlsMode ${ZITADEL_TLSMODE:-disabled}'
+    command: "start-from-init --masterkeyFromEnv --tlsMode external"
     environment:
       ZITADEL_DATABASE_POSTGRES_HOST: db
       ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
@@ -32,10 +31,11 @@ services:
       ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
       ZITADEL_MASTERKEY: ${ZITADEL_MASTERKEY}
       ZITADEL_EXTERNALDOMAIN: ${ZITADEL_EXTERNALDOMAIN}
-      # Required behind Cloudflare/HTTPS: without these the console page is https://
-      # but API calls go to http://… and get blocked by CSP (connect-src 'self').
-      ZITADEL_EXTERNALSECURE: ${ZITADEL_EXTERNALSECURE:-false}
-      ZITADEL_EXTERNALPORT: ${ZITADEL_EXTERNALPORT:-8080}
+      ZITADEL_EXTERNALSECURE: "true"
+      ZITADEL_EXTERNALPORT: "443"
+      ZITADEL_TLS_ENABLED: "true"
+      ZITADEL_TLS_CERTPATH: /etc/zitadel/tls/origin.pem
+      ZITADEL_TLS_KEYPATH: /etc/zitadel/tls/origin-key.pem
       # v4 defaults new instances to Login V2 (separate Next.js container + reverse proxy).
       # We stay on the bundled legacy login UI (served at :8080/ui/login) to keep this
       # compose file to the brief's 3 services — no Traefik, no extra login container.
@@ -43,4 +43,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports: ["8080:8080"]
+    expose:
+    - "8080"
+    networks:
+      - default
+      - proxy
+
+networks:
+  default:
+  proxy:
+    external: true

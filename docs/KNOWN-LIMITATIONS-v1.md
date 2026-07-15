@@ -23,8 +23,10 @@
   `zitadel/actions/token-claims.md` §4) ไม่งั้น target ยิง endpoint ใน private net ไม่ได้
 - runbook ฝั่ง entitlement (`db:migrate`, `db:seed`, insert `platform_admins` row) —
   ดู `.superpowers/sdd/` reports; ควรรวมเป็น operator doc เดียวตอน containerize
-- Zitadel Action e2e (สร้าง PAT/OIDC app/target + login จริง + decode token) = **MANUAL VERIFY**
-  ทั้งหมด ยังไม่ทดสอบกับ instance จริง (ดู token-claims.md §6/§7)
+- OIDC discovery/JWKS, Web app Authorization Code + PKCE, JWT issuance และ decode
+  `aud`/`iss`/`sub` **verify แล้วบน pre-test** (2026-07-15); ส่วน service-user PAT,
+  Actions v2 target/execution และ custom-claims e2e ยังเป็น **MANUAL VERIFY**
+  (ดู `docs/PRETEST-AUTH-DEPLOYMENT.md` และ token-claims.md §6/§7).
 - V1 **ยังไม่มี Zitadel Project Grant automation**: shared product projects ต้องปิด
   **Check for Project on Authentication** และให้ `tenant_modules` + JWT claims คุม product
   access. Future defense-in-depth ค่อย sync ซื้อ/ยกเลิก module → create/revoke Project Grant
