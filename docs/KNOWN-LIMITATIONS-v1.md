@@ -42,6 +42,23 @@
   (grant_all → `['*']` ผ่าน can ได้แม้ module ปิด) — พิจารณา filter `'*'` ด้วย enabled modules
   ฝั่ง server ใน V2
 
+## Social login (Google / Apple ID) — ยังไม่เปิด, เปิดหลังเทส flow หลักผ่าน
+
+Zitadel รองรับ federated IdP ในตัวอยู่แล้ว การเปิดใช้**ไม่กระทบสัญญากับฝั่ง client**
+(ปุ่มโผล่บนหน้า login ของ Zitadel เอง, OIDC flow เดิม) — จงใจเลื่อนไว้หลัง custom-claims
+e2e ผ่าน สิ่งที่ต้องทำตอนเปิด:
+
+- **Google**: สร้าง OAuth client ใน Google Cloud Console (ฟรี) → ใส่ client ID/secret ใน
+  Zitadel Console → Identity Providers + ลงทะเบียน callback URL ฝั่ง Google
+- **Apple**: ต้องมี **Apple Developer account ($99/ปี)** — สร้าง Services ID + Team ID +
+  Key ID + private key (.p8). **App Store rule**: ถ้าแอป iOS มี social login อื่น (เช่น Google)
+  จะถูกบังคับให้มี Sign in with Apple ด้วย → ตัดสินใจงบก่อนเปิด Google บน iOS
+- เปิด provider ใน login policy ของ instance/org
+- **สำคัญกับ entitlement**: user ที่ login ผ่าน Google ครั้งแรก = user ใหม่ใน Zitadel ที่ยังไม่ถูก
+  provision → ไม่มีสิทธิ์ (ถูกต้องตาม design) แต่ถ้าอยากให้คนที่ถูก invite ด้วย email ใช้
+  Google login เข้า account เดิมได้ ต้องเปิด **auto-linking by email** ใน Zitadel
+  ไม่งั้นจะกลายเป็นคนละ `zitadel_user_id` แล้วสิทธิ์ที่ invite ไว้หาย
+
 ## Robustness (post-V1, ยอมรับได้ใต้ "โค้ดง่ายที่สุด")
 - **ไม่มี transaction**: `createTenant` (Zitadel org → tenant → tenant_modules) และ `inviteUser`
   (user → user_companies → user_roles) partial-fail ได้ → เหลือ orphan. invite validate ก่อน

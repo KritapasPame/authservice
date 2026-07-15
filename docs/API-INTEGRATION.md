@@ -90,3 +90,5 @@ User ที่ยังไม่ถูก provision ในระบบ entitleme
 - Custom claims (`urn:platform:*`) ยังไม่ live (ดู §4)
 - Access token lifetime ยังเป็นค่า default — จะปรับเป็น 10 นาที + refresh token policy
 - Passkey/biometric login ยังไม่เปิดใช้
+- **Social login (Google / Apple ID) ยังไม่เปิดใช้** — จะเปิดภายหลังโดย**ฝั่ง client
+  ไม่ต้องแก้โค้ด** (ปุ่มจะโผล่บนหน้า login ของ Auth Service เอง ผ่าน OIDC flow เดิม)
