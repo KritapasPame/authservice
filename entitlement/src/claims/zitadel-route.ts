@@ -26,7 +26,13 @@ export const zitadelClaimsRouter = new Elysia({ prefix: '/internal/zitadel' })
       return 'no'
     }
 
-    const payload = JSON.parse(raw) as { user?: { id?: string } }
+    let payload: { user?: { id?: string } }
+    try {
+      payload = JSON.parse(raw)
+    } catch {
+      set.status = 400
+      return { error: 'invalid json' } // no parser error string leak
+    }
     const zitadelUserId = payload.user?.id
     const claims = zitadelUserId ? await resolveClaims(zitadelUserId) : {}
 

@@ -127,6 +127,14 @@ test('stale timestamp (older than the 300s tolerance) → 401', async () => {
   expect(res.status).toBe(401)
 })
 
+test('valid HMAC signature over a non-JSON body → 400, no parser error detail leaked', async () => {
+  const raw = 'not valid json {{{'
+  const res = await post(raw, sign(raw, TEST_KEY))
+  expect(res.status).toBe(400)
+  const body = await res.json()
+  expect(body).toEqual({ error: 'invalid json' })
+})
+
 test('signing key unset in env → 401 even with an otherwise well-formed signature', async () => {
   const raw = JSON.stringify(zitadelPayload('whoever'))
   const sig = sign(raw, TEST_KEY)
