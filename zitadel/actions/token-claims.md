@@ -19,7 +19,7 @@ Zitadel has two Action systems:
 |---|---|---|
 | How | JS (goja) scripts run inside Zitadel (`complementToken` flow, `preAccessTokenCreation` trigger) | Zitadel POSTs a JSON payload to an external HTTP **target**; an **execution** binds the target to a condition |
 | Status in v4.16.0 | Still executed (v1 script flows run in the same code path as v2 targets — [`internal/api/oidc/userinfo.go`](https://github.com/zitadel/zitadel/blob/v4.16.0/internal/api/oidc/userinfo.go) runs `actions.Run(...)` then `execution.CallTargets(...)`) | Fully supported; API endpoints exist **[verified live]** (see §7) |
-| Future | Deprecated — no new features, planned removal in Zitadel v5 ([zitadel/zitadel#10833 "Remove Actions V1"](https://github.com/zitadel/zitadel/issues/10833), [migration guide](https://zitadel.com/docs/guides/integrate/actions/migrate-from-v1)) | The supported path |
+| Future | **Deprecated in Zitadel v5; removal targeted for v6** ([zitadel/zitadel#10833 "Remove Actions V1"](https://github.com/zitadel/zitadel/issues/10833)) — no new features. The [migration guide](https://zitadel.com/docs/guides/integrate/actions/migrate-from-v1)'s "sunsetted in V5" wording refers to the v5 deprecation, not removal | The supported path |
 
 **Decision: use Actions v2.** The v1 `preAccessTokenCreation` flow maps to the v2
 **function condition `preaccesstoken`**
@@ -185,7 +185,7 @@ private CIDR ranges** — `10.0.0.0/8`, `172.16.0.0/12` (Docker compose networks
 `192.168.0.0/16` (Docker Desktop's `host.docker.internal`), etc. It is enforced
 both when *creating* the target (URL validation in `AddTarget.isValid` →
 `denylist.IsURLBlocked`) and at *call time* by the dialer — sources:
-[`cmd/defaults.yaml` L1080-1100](https://github.com/zitadel/zitadel/blob/v4.16.0/cmd/defaults.yaml),
+[`cmd/defaults.yaml` L1086-1100](https://github.com/zitadel/zitadel/blob/v4.16.0/cmd/defaults.yaml),
 [`internal/command/action_v2_target.go`](https://github.com/zitadel/zitadel/blob/v4.16.0/internal/command/action_v2_target.go).
 
 So `http://entitlement:3000/...` (or `http://host.docker.internal:3000/...` in
@@ -230,21 +230,33 @@ Only `restCall` targets have their **response parsed**; `restWebhook` checks the
 status code only and `restAsync` ignores the response entirely — source:
 [`internal/execution/execution.go` L79-110](https://github.com/zitadel/zitadel/blob/v4.16.0/internal/execution/execution.go).
 
+**Endpoint — current vs future state.** `docker-compose.yml` has **no
+`entitlement` service today** (only `db`, `redis`, `zitadel`); the entitlement app
+runs on the host. So:
+
+- **TODAY (the only working option):** `http://host.docker.internal:<PORT>/internal/zitadel/token-claims`
+  — Docker Desktop's host alias, reachable from the zitadel container. Resolves
+  into `192.168.65.0/24`, so the §4 deny-list override is **required**.
+- **FUTURE (once the entitlement service joins the compose file, per the design
+  spec §8):** `http://entitlement:3000/internal/zitadel/token-claims` — compose
+  networks are `172.16.0.0/12`, so the §4 override is required there too.
+
+Route path is the §3 adapter, not `/internal/claims`.
+
 ```bash
 curl -sf -X POST "http://localhost:8080/v2/actions/targets" \
   -H "Authorization: Bearer $ZITADEL_PAT" -H "Content-Type: application/json" \
   -d '{
     "name": "entitlement-token-claims",
     "restCall": { "interruptOnError": true },
-    "endpoint": "http://entitlement:3000/internal/zitadel/token-claims",
+    "endpoint": "http://host.docker.internal:3000/internal/zitadel/token-claims",
     "timeout": "5s"
   }'
 # → { "id": "<TARGET_ID>", "creationDate": "...", "signingKey": "<SAVE ME ONCE>" }
 ```
 
-(Endpoint shown for the compose-internal case; use
-`http://host.docker.internal:<PORT>/...` while the entitlement app runs on the
-host. Route path is the §3 adapter, not `/internal/claims`.)
+(Swap the endpoint for the compose-internal URL when the entitlement service is
+containerized — update the target via UpdateTarget or re-create it.)
 
 - `interruptOnError: true` → if the entitlement service is down, **token issuance
   fails** (fail-closed; no tokens without claims). `false` would issue tokens
@@ -279,8 +291,8 @@ Execution with condition type *Function* = `preaccesstoken`
 
 ### 5.3 Set the OIDC app to JWT access tokens
 
-Console → project → your application → Token Settings → **Auth Token Type = JWT**
-(required, see §1). **MANUAL VERIFY**.
+Console → project → your application → Token Settings → **Access Token Type = JWT**
+(required, see §1). **MANUAL VERIFY** the exact console label.
 
 ---
 
