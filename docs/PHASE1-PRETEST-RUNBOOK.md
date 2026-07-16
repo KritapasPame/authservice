@@ -30,10 +30,11 @@ ZITADEL_HTTPCLIENT_DENYLIST: "169.254.0.0/16,100.64.0.0/10,0.0.0.0/8"
 
 ## 3. รัน entitlement service ให้ Zitadel ยิงถึง
 
-entitlement ยังไม่ containerized (Phase 3) — รันบน host:
+entitlement อยู่ใน compose แล้ว (service `entitlement`, ใน network = `entitlement:3000`,
+จาก host = `localhost:3020`):
 
 ```bash
-cd entitlement && bun run src/index.ts
+docker compose up -d entitlement
 ```
 
 env ที่ต้องมี (`entitlement/src/config/env.ts`): `DATABASE_URL`, `ZITADEL_ISSUER`,
@@ -45,7 +46,7 @@ env ที่ต้องมี (`entitlement/src/config/env.ts`): `DATABASE_URL
 ```bash
 ZITADEL_PAT=<PAT จากข้อ 1> ./scripts/setup-zitadel-action.sh
 # default: ZITADEL_URL=https://authservice.edmcompany.co.th
-#          endpoint=http://host.docker.internal:3000/internal/zitadel/token-claims
+#          endpoint=http://entitlement:3000/internal/zitadel/token-claims (compose network)
 ```
 
 - สคริปต์พิมพ์ `signingKey` **ครั้งเดียว** → ใส่ env `ZITADEL_ACTIONS_SIGNING_KEY`
@@ -72,11 +73,11 @@ Console → default settings (instance) → Token lifetimes:
 
 ```bash
 # invite (สร้าง zitadel user + users row + membership + tenant-wide role)
-curl -X POST http://localhost:3000/users/invite -H "Authorization: Bearer <superadmin JWT>" \
+curl -X POST http://localhost:3020/users/invite -H "Authorization: Bearer <superadmin JWT>" \
   -H "Content-Type: application/json" \
   -d '{"tenantId":1,"email":"test@example.com","companyIds":[1],"roleSlugs":["group_admin"]}'
 # หรือ assign role ต่อ company (endpoint ใหม่)
-curl -X POST http://localhost:3000/users/<id>/roles -H "Authorization: Bearer <JWT>" \
+curl -X POST http://localhost:3020/users/<id>/roles -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" -d '{"roleSlug":"hr_admin","companyId":2}'
 ```
 

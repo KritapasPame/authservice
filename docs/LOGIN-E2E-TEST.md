@@ -66,21 +66,22 @@ curl -s -o /dev/null -w "%{http_code}\n" https://authservice.edmcompany.co.th/pa
 
 **พิสูจน์**: ทั้งเส้น invite → login → grants ต่อ company → `canUse()` ฝั่ง eSign
 
-ใช้ JWT superadmin จาก Stage 3 ยิง API ของ entitlement (รันบนเซิร์ฟเวอร์ — entitlement ไม่ public):
+ใช้ JWT superadmin จาก Stage 3 ยิง API ของ entitlement (รันบนเซิร์ฟเวอร์ — entitlement ไม่ public;
+container map `3020:3000` → จาก host ใช้ `localhost:3020`):
 
 ```bash
 T="<superadmin access token>"
 # 1. tenant (สร้าง Zitadel org ให้ด้วย)
-curl -s -X POST localhost:3000/tenants -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
+curl -s -X POST localhost:3020/tenants -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
   -d '{"name":"EDM Test","slug":"edm-test"}'
 # 2. company ในเครือ
-curl -s -X POST localhost:3000/companies -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
+curl -s -X POST localhost:3020/companies -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
   -d '{"tenantId":1,"name":"บริษัท A"}'
-# 3. เปิด module esign ให้ tenant (ตอนนี้ยังไม่มี API — insert ตรง: tenant_modules)
-docker compose exec db psql -U <user> <db> -c \
-  "INSERT INTO tenant_modules (tenant_id, module_id) SELECT 1, id FROM modules WHERE key='esign' ON CONFLICT DO NOTHING;"
+# 3. เปิด module esign ให้ tenant (superadmin เท่านั้น; module 'core' เปิดให้อัตโนมัติตั้งแต่สร้าง tenant)
+curl -s -X PUT localhost:3020/modules/tenants/1/esign -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
+  -d '{"enabled":true}'   # → {"ok":true}
 # 4. invite user (สร้าง Zitadel human user + provision ครบ)
-curl -s -X POST localhost:3000/users/invite -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
+curl -s -X POST localhost:3020/users/invite -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
   -d '{"tenantId":1,"email":"test-user@edmcompany.co.th","companyIds":[1],"roleSlugs":["company_admin"]}'
 ```
 

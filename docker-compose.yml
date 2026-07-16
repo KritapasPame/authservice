@@ -49,6 +49,22 @@ services:
       - default
       - proxy
 
+  login:
+    # Login V2 (หน้า login กลาง) — เปิดใช้ด้วย profile หลังมี PAT:
+    #   docker compose --profile login up -d login
+    # ต้องมี LOGIN_CLIENT_PAT ใน .env (PAT ของ SA บทบาท IAM_LOGIN_CLIENT)
+    image: ghcr.io/zitadel/zitadel-login:v4.16.0
+    profiles: ["login"]
+    environment:
+      ZITADEL_API_URL: https://${ZITADEL_EXTERNALDOMAIN}
+      ZITADEL_SERVICE_USER_TOKEN: ${LOGIN_CLIENT_PAT:-}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - default
+      - proxy
+
   entitlement:
     build:
       context: .

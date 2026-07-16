@@ -53,86 +53,87 @@
 |-----|------------|----------|
 | **ทีม ops / dev** | `/ui/console` | ตั้งค่า PAT, app, user — **ไม่ให้ลูกค้าเข้า** |
 | **End user** | ไม่เปิด authservice โดยตรง | เข้าผ่าน **eSign** เท่านั้น |
-| **End user** | หน้า login ของ **eSign เท่านั้น** | **ห้าม** redirect ไป `/ui/login` หรือหน้า Zitadel ใดๆ — ดู §4 |
+| **End user** | หน้า **login กลาง** (Login V2 โดเมน/แบรนด์เรา) | **ห้าม** เห็น `/ui/login` V1 หรือ Console — ดู §4 |
 
 Bootstrap `zitadel-admin@...` ใช้ทด wiring ได้ — **ไม่ใช่** user demo ให้ stakeholder
 
 ---
 
-## 4. แผน eSign — Custom Login V1 (บังคับ)
+## 4. แผน Login กลาง — Self-hosted Login V2 (V1)
 
-### ข้อกำหนด (non-negotiable)
+> **ตัดสินใจ 2026-07-16: ใช้หน้า login กลาง (self-host Login V2) แทนการฝัง login ในแต่ละแอป**
+> เหตุผล: มีหลายแอปในแผน (eSign → portal → HR) — หน้ากลางทำครั้งเดียวได้ SSO ทุกแอป,
+> MFA/forgot password/passkey รวมศูนย์, login PAT อยู่ที่เดียว, แอปลูกเหลือแค่ OIDC client
+> (redirect + callback) — user ไม่ต้องเข้า portal ก่อน หน้ากลางโผล่เฉพาะตอน login แล้วเด้งกลับแอปเดิม
 
-- **Login V1 ของ Zitadel เปลี่ยน logo ได้จำกัด** — ไม่ใช่หน้ากากของบริษัท
-- **ห้าม** ให้ end user เห็น `/ui/login`, Console, หรือ UI open-source ของ Zitadel แม้ชั่วครู่
-- **V1 ต้องเป็น custom login ของ eSign 100%** — Zitadel อยู่หลังบ้านเท่านั้น (credential + OIDC + claims)
+### ข้อกำหนด (non-negotiable — เดิม)
 
-> แนวทางเดิม "redirect OIDC แล้ว flash หน้า Zitadel login" **ยกเลิก** — ไม่ใช้
+- **ห้าม** ให้ end user เห็น `/ui/login` (V1), Console, หรือ UI ที่ brand ไม่ได้ของ Zitadel
+- **Credential ยังอยู่ที่ Zitadel** — แอปลูกไม่เก็บรหัสผ่าน ไม่ถือ login PAT
+- หน้า login กลางอยู่บน**โดเมนเรา** + fork/brand ได้ 100% (logo, สี, copy ภาษาไทย)
 
-### หลักการที่ยึด
+### ทางเลือก (อัปเดต 2026-07-16)
 
-1. **ไม่ให้ user เข้า Console / ไม่ bookmark authservice**
-2. **Credential ยังอยู่ที่ Zitadel** (Session API) — eSign **ไม่เก็บรหัสผ่านถาวร**
-3. **eSign เป็น OIDC client + เป็น Custom Login UI** — verify JWT ด้วย `@platform/auth`
-4. **UI ที่ user เห็นทั้งหมด = eSign** (logo, สี, copy, forgot password, MFA)
-
-### ทางเลือกที่ใช้ได้ (V1)
-
-| ทาง | User เห็นอะไร | แนะนำ |
+| ทาง | User เห็นอะไร | สถานะ |
 |-----|----------------|-------|
-| **A. eSign Custom Login + Session API** | หน้า `/login` บนโดเมน eSign เท่านั้น | **✅ V1 — ใช้ทางนี้** |
-| B. Self-host Login V2 (fork Next.js ของ Zitadel) | หน้า `login.edmcompany.co.th` แยกจาก eSign | สำรอง — ถ้าไม่อยาก implement Session API ใน eSign |
+| **B. Self-host Login V2 — หน้า login กลาง** | `login.edmcompany.co.th` แบรนด์เรา — ทุกแอป redirect มาที่นี่ | **✅ V1 — ใช้ทางนี้** |
+| A. Custom Login ฝังใน eSign (Session API) | หน้า `/login` บนโดเมน eSign | สำรอง — ถ้า Login V2 ติดข้อจำกัด branding/feature |
 | ~~C. Branding บน hosted Login V1~~ | ยังเป็นหน้า Zitadel | **❌ ไม่ใช้** |
 | ~~D. OIDC redirect ไป `/ui/login`~~ | flash หน้า IdP | **❌ ไม่ใช้** |
 
 ---
 
-### Phase A — Custom Login บน eSign (V1)
-
-**User เห็น:** หน้า login/register/forgot-password ของ eSign เท่านั้น — ไม่มี redirect ไป authservice UI
-
-**Flow (OIDC + Custom Login UI ตาม [Zitadel docs](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard)):**
+### Flow (หน้า login กลาง)
 
 ```text
-eSign (unauthenticated)
+แอปลูก (eSign / portal) unauthenticated
   → browser redirect ไป https://authservice.../oauth/v2/authorize?...&PKCE
-  → Zitadel parse auth request (ไม่แสดง UI)
-  → 302 กลับ eSign: /login?authRequest=V2_xxx   ← ตั้ง Custom Login URL ใน OIDC app
-  → eSign แสดงฟอร์ม login ของตัวเอง (100% branding)
-  → eSign backend (server-side, ถือ PAT ของ IAM_LOGIN_CLIENT):
-       GET  /v2/oidc/auth_requests/{id}
-       POST /v2/sessions  (username + password / WebAuthn ตาม policy)
-       POST /v2/oidc/auth_requests/{id}  finalize ด้วย sessionToken
-  → redirect browser ไป callbackUrl (มี authorization code)
-  → eSign /callback แลก code → token ที่ /oauth/v2/token (PKCE)
+  → Zitadel ส่งต่อไปหน้า login กลาง (Login V2 — โดเมน/แบรนด์เรา)
+  → user กรอก password (/MFA/passkey ตาม policy) — Login V2 คุย Session API ให้เองทั้งหมด
+  → redirect กลับแอปลูก /callback พร้อม authorization code
+  → แอปแลก code → token ที่ /oauth/v2/token (PKCE)
   → access JWT มี urn:platform:* จาก entitlement (เหมือนที่ทดแล้ว)
 ```
 
-**สิ่งสำคัญ:** Browser **ไม่เคย** เปิด `/ui/login` — authorize endpoint ส่ง user กลับมาที่ eSign ทันที
+**สิ่งสำคัญ:** Browser **ไม่เคย** เปิด `/ui/login` V1 — และแอปลูก**ไม่ต้อง**ทำหน้า login,
+ไม่ใช้ Session API, ไม่ถือ PAT ใดๆ — เหลือแค่ authorize redirect + `/callback` + `@platform/auth`
 
-**งาน eSign (frontend + backend):**
+### Deploy Login V2 (container ใหม่ 1 ตัวใน compose เดิม)
 
-- [ ] หน้า `/login?authRequest=...` — UI 100% ของ eSign (ไม่มีลิงก์ไป Console)
-- [ ] Backend route ที่เรียก Zitadel **Session API v2** + finalize auth request (PAT เก็บ server-side เท่านั้น)
-- [ ] หน้า `/callback` — แลก code + PKCE verifier → session ของ eSign
-- [ ] (Optional แต่แนะนำ) proxy OIDC endpoints บางตัวถ้าต้องการ issuer เดียวกับ login domain — ไม่บังคับถ้า token แลกตรง authservice
-- [ ] env: `ZITADEL_ISSUER`, Client ID, redirect URIs, **`ZITADEL_LOGIN_CLIENT_PAT`** (IAM_LOGIN_CLIENT)
-- [ ] ใช้ `@platform/auth` ฝั่ง API — `can()`, `hasModule()`, grants ต่อ company
-- [ ] แจ้งทีม Auth: redirect URIs + Custom Login base URL + ค่า `aud` หลัง login ครั้งแรก
+| หัวข้อ | ค่า |
+|--------|-----|
+| Image | `ghcr.io/zitadel/zitadel-login` (pin tag ให้ตรงกับ zitadel v4.16) |
+| Port | 3000 (ภายใน compose) |
+| env | `ZITADEL_API_URL=https://authservice.edmcompany.co.th`, `ZITADEL_SERVICE_USER_TOKEN` = PAT ของ SA บทบาท **IAM_LOGIN_CLIENT** (หรือ `ZITADEL_SERVICE_USER_TOKEN_FILE` mount เป็นไฟล์) |
+
+**ขั้น demo (เร็วสุด — ไม่ต้องมี DNS/cert ใหม่):** nginx เดิมเพิ่ม route path
+`/ui/v2/login` → container login:3000 (base path default ของ Login V2) แล้วเปิด
+**"Use new login UI"** ที่ OIDC app ทดสอบใน Console → login ผ่านหน้าใหม่ได้ทันที claims เดิมครบ
+
+**ขั้น production:** ย้ายไป `login.edmcompany.co.th` — ลงทะเบียน **Trusted Domain**
+บน instance + https + ตั้ง Custom base URL ที่ app + fork UI ใส่ logo/สี/copy ของเรา
 
 **งาน Auth (ops):**
 
-- [ ] สร้าง Service Account + PAT บทบาท **`IAM_LOGIN_CLIENT`** (แยกจาก PAT ops ที่เป็น IAM_OWNER)
-- [ ] OIDC app eSign: ตั้ง **Custom Login URL** = origin ของ eSign (เช่น `https://esign.edmcompany.co.th`)
-- [ ] ลงทะเบียน redirect URI ของ eSign (dev/staging/prod)
-- [ ] ยืนยัน auth request redirect ไป eSign ไม่ไป `/ui/login` (ทดด้วย authorize URL ใน browser)
-- [ ] ส่ง eSign: Client ID, issuer, JWKS, login-client PAT (secure channel), `@platform/auth`
+- [ ] สร้าง Service Account + PAT บทบาท **`IAM_LOGIN_CLIENT`** (แยกจาก PAT ops ที่เป็น IAM_OWNER — เก็บใน compose เท่านั้น ไม่ส่งใคร)
+- [ ] เพิ่ม service `login` ใน compose + nginx route (`/ui/v2/login` สำหรับ demo)
+- [ ] เปิด "Use new login UI" ที่ OIDC app + ลงทะเบียน redirect URI ของแอปลูก (dev/staging/prod)
+- [ ] smoke test: authorize URL → ต้องได้หน้า Login V2 ไม่ใช่ `/ui/login` → login → claims ครบ
+- [ ] ส่งแอปลูก: Client ID, issuer, JWKS URL, `@platform/auth` (**ไม่มี PAT** — ไม่ต้องใช้แล้ว)
+
+**งานแอปลูก (eSign / portal):**
+
+- [ ] authorize redirect + PKCE (เก็บ `code_verifier`)
+- [ ] หน้า `/callback` — แลก code → session ของแอป
+- [ ] ใช้ `@platform/auth` ฝั่ง API — `can()`, `hasModule()`, grants ต่อ company
+- [ ] user ไม่มี `urn:platform:*` → แสดง "ยังไม่ได้รับสิทธิ์" (ไม่ crash, ไม่ลิงก์ Console)
+- [ ] แจ้งทีม Auth: redirect URIs ทุก env
 
 **ไม่ทำ:**
 
-- ส่ง username/password จาก browser ตรงไป Zitadel โดยไม่มี server (PAT ห้ามอยู่ frontend)
+- ฝังหน้า login / Session API ในแอปลูก (ย้ายไปหน้ากลางแล้ว — ทางสำรองเท่านั้น)
 - ROPC / resource-owner password grant
-- ให้ user เข้า `/ui/console` หรือ `/ui/login`
+- ให้ user เข้า `/ui/console` หรือ `/ui/login` V1
 
 **อ้างอิง API (Zitadel official):**
 
@@ -143,7 +144,7 @@ eSign (unauthenticated)
 | Session validation / MFA / Passkey (Phase 3–4) | https://zitadel.com/docs/guides/integrate/login-ui |
 | IAM_LOGIN_CLIENT + PAT | https://zitadel.com/docs/self-hosting/manage/login-client |
 | Application: Login V2 per-app + Custom base URL | https://zitadel.com/docs/guides/manage/console/applications-overview |
-| Hosted Login V2 (ทางสำรอง Phase C) | https://zitadel.com/docs/guides/integrate/login/hosted-login |
+| Self-host Login V2 container (ทางหลัก V1) | https://zitadel.com/docs/self-hosting/manage/login-client |
 
 **อ้างอิงใน repo นี้:**
 
@@ -159,42 +160,35 @@ eSign (unauthenticated)
 
 ## 5. Phase ถัดไป — ลำดับงาน 1–4 (Zitadel vs eSign)
 
-> **หมายเหตุ instance ปัจจุบัน:** compose ตั้ง `ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED=false` — ยังไม่ deploy container Login V2 ของ Zitadel แต่ **per-application** เปิด "Use new login UI" + Custom base URL ชี้ eSign ได้ (Session API flow) ตาม [Applications overview](https://zitadel.com/docs/guides/manage/console/applications-overview)
+> **หมายเหตุ instance ปัจจุบัน:** compose ตั้ง `ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED=false` (Console/ops ยังใช้ V1 ได้ตามเดิม) — Phase 1 จะ deploy container Login V2 เพิ่ม แล้วเปิด **per-application** "Use new login UI" เฉพาะแอปลูก ตาม [Applications overview](https://zitadel.com/docs/guides/manage/console/applications-overview)
 
 ---
 
-### Phase 1 — Custom Login MVP (บังคับ V1)
+### Phase 1 — Login กลาง MVP (บังคับ V1)
 
-**เป้าหมาย:** User login บนหน้า eSign เท่านั้น → ได้ JWT พร้อม `urn:platform:*` — **ไม่เห็น** `/ui/login`
+**เป้าหมาย:** User login บนหน้า login กลาง (แบรนด์เรา) → ได้ JWT พร้อม `urn:platform:*` — **ไม่เห็น** `/ui/login` V1
 
 #### ฝั่ง Zitadel (ทีม Auth) — 1, 2, 3, 4
 
 | # | งาน | รายละเอียด | อ้างอิง |
 |---|------|------------|---------|
-| **1** | สร้าง Service Account **`IAM_LOGIN_CLIENT`** + PAT | Machine user ใหม่ แยกจาก PAT ops (`IAM_OWNER`) → grant บทบาท **Instance Login Client** → สร้าง PAT เก็บไฟล์/ส่ง eSign ทางช่องทางปลอดภัย | [Connect self-hosted Login UI](https://zitadel.com/docs/self-hosting/manage/login-client) |
-| **2** | ตั้ง OIDC app eSign — Login UI + Custom base URL | Console → Project → Application eSign → เปิด **Use new login UI** → **Custom base URL** = origin eSign (เช่น `https://esign.edmcompany.co.th`) — *ไม่* ใช้ `/ui/login` V1 | [Applications — Use New Login UI](https://zitadel.com/docs/guides/manage/console/applications-overview) |
-| **3** | ลงทะเบียน Redirect URI + Post-logout URI | ทุก env ที่ eSign แจ้ง (local / pre-test / prod) — Auth method = Authorization Code + **PKCE**, Access Token Type = **JWT** (ตั้งแล้ว) | [OIDC authorize](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard), repo: `zitadel/docker-init.md` §4 |
-| **4** | Smoke test redirect + ส่ง config ให้ eSign | เปิด authorize URL ใน browser → ต้องไป `https://esign.../login?authRequest=V2_...` **ไม่ใช่** `/ui/login` → ส่ง Client ID, issuer, JWKS URL, login-client PAT, `@platform/auth` | [Get Auth Request By ID](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard) |
+| **1** | สร้าง Service Account **`IAM_LOGIN_CLIENT`** + PAT | Machine user ใหม่ แยกจาก PAT ops (`IAM_OWNER`) → grant บทบาท **Instance Login Client** → PAT ใส่ env ของ login container เท่านั้น (ไม่ส่งทีมแอป) | [Connect self-hosted Login UI](https://zitadel.com/docs/self-hosting/manage/login-client) |
+| **2** | Deploy **Login V2 container** | เพิ่ม service ใน compose: `ghcr.io/zitadel/zitadel-login` + `ZITADEL_API_URL` + `ZITADEL_SERVICE_USER_TOKEN` → nginx route `/ui/v2/login` (demo) หรือ `login.edmcompany.co.th` + Trusted Domain (prod) | §4 ด้านบน, [Login App](https://zitadel.com/docs/guides/integrate/login-ui/login-app) |
+| **3** | เปิด **Use new login UI** ต่อ app + Redirect URIs | Console → Project → Application → เปิด new login UI; ลงทะเบียน Redirect + Post-logout URI ทุก env — Auth method = Authorization Code + **PKCE**, Access Token Type = **JWT** (ตั้งแล้ว) | [Applications overview](https://zitadel.com/docs/guides/manage/console/applications-overview), repo: `zitadel/docker-init.md` §4 |
+| **4** | Smoke test + ส่ง config ให้แอปลูก | เปิด authorize URL → ต้องได้หน้า Login V2 **ไม่ใช่** `/ui/login` → login → claims ครบ → ส่ง Client ID, issuer, JWKS URL, `@platform/auth` (**ไม่มี PAT**) | repo: `scripts/oidc-pkce-test.py` |
 
-**Zitadel API ที่ eSign backend จะเรียก (Auth ไม่ต้องเปิด endpoint เพิ่ม — ใช้ของ Zitadel โดยตรง):**
+**แอปลูกไม่ต้องเรียก Session API เลย** — Login V2 จัดการ auth request + session + finalize ให้ทั้งหมด
+แอปลูกแตะแค่ endpoint OIDC มาตรฐาน: `/oauth/v2/authorize` (redirect) + `POST /oauth/v2/token` (แลก code)
 
-| Endpoint | ใช้เมื่อ |
-|----------|----------|
-| `GET /v2/oidc/auth_requests/{id}` | อ่าน clientId, scope, redirectUri จาก authRequest |
-| `POST /v2/sessions` + `PATCH /v2/sessions/{id}` | ตรวจ username + password |
-| `POST /v2/oidc/auth_requests/{id}` | finalize ด้วย sessionId + sessionToken → ได้ callbackUrl |
-| `POST /oauth/v2/token` | แลก code + PKCE (จาก eSign `/callback`) |
-
-#### ฝั่ง eSign — 1, 2, 3, 4
+#### ฝั่งแอปลูก (eSign) — 1, 2, 3
 
 | # | งาน | รายละเอียด | อ้างอิง |
 |---|------|------------|---------|
-| **1** | หน้า **`/login?authRequest=...`** | UI 100% branding eSign — รับ query `authRequest` หลัง redirect จาก authorize | [OIDC in Custom Login UI](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard) |
-| **2** | **Backend** Session API (ถือ PAT server-side) | `GET auth_requests` → `POST/PATCH sessions` (password) → `POST finalize` → redirect browser ไป `callbackUrl` | [Username & Password](https://zitadel.com/docs/guides/integrate/login-ui/username-password), env: `ZITADEL_LOGIN_CLIENT_PAT` ใน `docs/API-INTEGRATION.md` |
-| **3** | หน้า **`/callback`** + PKCE | เก็บ `code_verifier` ตั้งแต่เริ่ม authorize → แลก token ที่ issuer → เก็บ session แอpp | [OIDC discovery](https://authservice.edmcompany.co.th/.well-known/openid-configuration), repo: `scripts/oidc-pkce-test.py` |
-| **4** | อ่าน claims + UX ไม่มีสิทธิ์ | ใช้ `@platform/auth` — ถ้าไม่มี `urn:platform:*` แสดง "ยังไม่ได้รับสิทธิ์" — **ไม่** ลิงก์ `/ui/console` | repo: `docs/API-INTEGRATION.md` §4, `docs/PACKAGE-DISTRIBUTION.md` |
+| **1** | authorize redirect + **`/callback`** + PKCE | เก็บ `code_verifier` ตั้งแต่เริ่ม authorize → แลก token ที่ issuer → เก็บ session แอป | [OIDC discovery](https://authservice.edmcompany.co.th/.well-known/openid-configuration), repo: `scripts/oidc-pkce-test.py` |
+| **2** | อ่าน claims + UX ไม่มีสิทธิ์ | ใช้ `@platform/auth` — ถ้าไม่มี `urn:platform:*` แสดง "ยังไม่ได้รับสิทธิ์" — **ไม่** ลิงก์ `/ui/console` | repo: `docs/API-INTEGRATION.md` §4, `docs/PACKAGE-DISTRIBUTION.md` |
+| **3** | แจ้ง redirect URIs ทุก env ให้ทีม Auth | local / pre-test / prod | — |
 
-**ส่งกลับทีม Auth ก่อนปิด Phase 1:** Redirect URIs, Custom Login base URL, ค่า `aud` จาก JWT ครั้งแรก
+**ส่งกลับทีม Auth ก่อนปิด Phase 1:** Redirect URIs + ค่า `aud` จาก JWT ครั้งแรก
 
 ---
 
@@ -235,14 +229,15 @@ eSign (unauthenticated)
 | **3** | Password complexity settings | ให้ eSign อ่าน policy ก่อน validate ฝั่ง UI | [Username & Password — settings](https://zitadel.com/docs/guides/integrate/login-ui/username-password) |
 | **4** | User creation API (ถ้า self-register) | สิทธิ์ PAT สำหรับ create human user — หรือ ops สร้างใน Console แล้ว provision entitlement | `POST /v2/users/human` ใน doc เดียวกัน |
 
-#### ฝั่ง eSign — 1, 2, 3, 4
+#### ฝั่งแอปลูก (eSign)
+
+> MFA / forgot password / account picker เป็น UI ของ **Login V2 อยู่แล้ว** — งานฝั่งแอปลูกหายไป
+> เหลือเปิด policy ฝั่ง Zitadel + งาน **fork/brand Login V2** (logo, สี, copy ไทย) ซึ่งเป็นของทีม Auth
 
 | # | งาน | รายละเอียด | อ้างอิง |
 |---|------|------------|---------|
-| **1** | Step MFA บน custom login | หลัง password → `PATCH /v2/sessions` เพิ่ม TOTP check ก่อน finalize | [MFA](https://zitadel.com/docs/guides/integrate/login-ui/mfa) |
-| **2** | Forgot / reset password UI | เรียก User/Session API หรือ deep link template ที่ branding eSign | [Password Reset](https://zitadel.com/docs/guides/integrate/login-ui/password-reset) |
-| **3** | Register หรือ invite-only | ตาม product — หลังสร้าง user ใน Zitadel → webhook/ops provision entitlement | design spec §5, §9 |
-| **4** | Account picker (optional) | หลาย session — cookie เก็บ sessionIds + `POST /v2/sessions/search` | [Select Account](https://zitadel.com/docs/guides/integrate/login-ui/select-account) |
+| **1** | Invite-only flow | invite ผ่าน entitlement (`/users/invite`) → user ตั้งรหัสครั้งแรกบนหน้า login กลาง | design spec §5, §9; `docs/LOGIN-E2E-TEST.md` Stage 4 |
+| **2** | ทดสอบ MFA / reset จากมุมแอป | login ผ่านหน้ากลางครบทุกเคสแล้วกลับมา `/callback` ปกติ | — |
 
 ---
 
@@ -259,29 +254,28 @@ eSign (unauthenticated)
 | **3** | Trusted Domains (ถ้าต้อง proxy OIDC บนโดเมน eSign) | ลงทะเบียน domain ที่ login UI ใช้ | [Login App — trusted domains](https://zitadel.com/docs/guides/integrate/login-ui/login-app) |
 | **4** | Monitoring + backup PAT | เก็บ IAM_OWNER PAT สำรองกรณี lockout; audit login จาก Zitadel | [Login client setup — IAM_OWNER backup](https://zitadel.com/docs/self-hosting/manage/login-client) |
 
-#### ฝั่ง eSign — 1, 2, 3, 4
+#### ฝั่งแอปลูก (eSign)
+
+> Passkey / Social login เป็นปุ่มบนหน้า login กลาง (Login V2 มีให้) — เปิด policy/IdP ฝั่ง Zitadel พอ
 
 | # | งาน | รายละเอียด | อ้างอิง |
 |---|------|------------|---------|
-| **1** | ปุ่ม Passkey บนหน้า login | Session API WebAuthn checks — ไม่ redirect IdP | [Passkey](https://zitadel.com/docs/guides/integrate/login-ui/passkey) |
-| **2** | ปุ่ม Social login | External IdP flow บน custom UI | [External Login](https://zitadel.com/docs/guides/integrate/login-ui/external-login) |
-| **3** | Rate limit / lockout UX | แสดงข้อความเมื่อ Zitadel ตอบ locked / too many attempts | Session API responses |
-| **4** | E2E test ทุก env | login → claims → API 403/200 → logout — CI ถ้ามี | repo: `scripts/oidc-pkce-test.py` (adapt สำหรับ custom login) |
+| **1** | E2E test ทุก env | login → claims → API 403/200 → logout — CI ถ้ามี | repo: `scripts/oidc-pkce-test.py` |
 
 ---
 
-### ทางสำรอง (ถ้า Phase 1 eSign ล่าช้า) — Login V2 container แยก
+### ทางสำรอง (ถ้า Login V2 ติดข้อจำกัด branding/feature) — ฝัง Custom Login ในแอป
 
 | ฝั่ง | งาน | อ้างอิง |
 |------|------|---------|
-| Zitadel | Deploy Login V2 Next.js + enable instance feature + base URI `login.edmcompany.co.th` | [Login App](https://zitadel.com/docs/guides/integrate/login-ui/login-app), [Hosted Login V2](https://zitadel.com/docs/guides/integrate/login/hosted-login) |
-| eSign | ยังเป็น OIDC client — redirect ไป custom login domain แทน implement Session API เอง | §4 Phase C ด้านบน |
+| แอปลูก | ทำหน้า `/login?authRequest=...` เอง + backend Session API (`GET auth_requests` → `POST/PATCH sessions` → finalize) + ถือ login PAT server-side | [OIDC in Custom Login UI](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard), [Username & Password](https://zitadel.com/docs/guides/integrate/login-ui/username-password) |
+| Zitadel | ตั้ง Custom Login URL ของ app ชี้ origin แอปลูกแทนหน้ากลาง | [Applications overview](https://zitadel.com/docs/guides/manage/console/applications-overview) |
 
 ---
 
 ## 6. Checklist ทีม Auth (ops) — สรุปรวม
 
-- [ ] Phase 1 #1–4 (IAM_LOGIN_CLIENT, Custom base URL, redirect URIs, smoke test)
+- [ ] Phase 1 #1–4 (IAM_LOGIN_CLIENT PAT, deploy Login V2 container + nginx route, Use new login UI + redirect URIs, smoke test)
 - [ ] Phase 2 #1–4 (token TTL, refresh, logout URI, human superadmin + provision test user)
 - [ ] ทด human `superadmin` + `platform_admins` ตรง `sub` (incognito)
 - [ ] Provision test user ใน entitlement (tenant + company + role) → claims แบบ grants
@@ -292,21 +286,20 @@ eSign (unauthenticated)
 
 ## 7. Checklist ทีม eSign — สรุปรวม
 
-- [ ] Phase 1 #1–4 (custom login, Session API backend, callback, claims UX)
+- [ ] Phase 1 #1–3 (authorize redirect + PKCE, `/callback`, claims UX) — **ไม่ต้องทำหน้า login / Session API**
 - [ ] Phase 2 #1–4 (`@platform/auth`, refresh, logout, errors)
 - [ ] อ่าน `docs/API-INTEGRATION.md` + ติด `@platform/auth`
-- [ ] ส่ง redirect URIs + Custom Login base URL ให้ทีม Auth
+- [ ] ส่ง redirect URIs ทุก env ให้ทีม Auth
 - [ ] หลัง login: อ่าน `sub`, `urn:platform:tenantId`, `urn:platform:grants`
 - [ ] User ไม่ provision → ไม่มี platform claims → แสดง "ยังไม่ได้รับสิทธิ์" (ไม่ crash)
 - [ ] ไม่ลิงก์ไป `/ui/console` ใน UI ใดๆ
-- [ ] (Phase 3–4) MFA, forgot password, passkey, social — ตามตาราง §5
 
 ---
 
 ## 8. สรุป one-liner ให้ stakeholder
 
 > Auth ทำงานแล้วบน pre-test: OIDC + custom claims live  
-> V1 บังคับ **eSign custom login** (Session API) — user ไม่เห็นหน้า Zitadel; Zitadel เป็น backend credential + token เท่านั้น
+> V1 ใช้ **หน้า login กลาง** (self-host Login V2 บนโดเมนเรา แบรนด์เรา) — ทุกแอปเด้งมา login ที่นี่แล้วกลับแอปเดิม, user ไม่เห็นหน้า Zitadel, แอปลูกเป็นแค่ OIDC client
 
 ---
 

@@ -77,6 +77,15 @@ server {
     ssl_certificate     /etc/nginx/ssl/authservice-origin.pem;
     ssl_certificate_key /etc/nginx/ssl/authservice-origin-key.pem;
 
+    # Login V2 (หน้า login กลาง) — HTTP ธรรมดา ไม่ใช่ gRPC; prefix ยาวกว่าจึงชนะ location /
+    # service `login` ใน compose (profile "login") ต้องรันก่อน ไม่งั้น 502
+    location /ui/v2/login {
+        proxy_pass http://login:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+
     location / {
         grpc_pass grpc://zitadel:8080;
         grpc_set_header Host $host;
@@ -139,9 +148,10 @@ ZITADEL_MGMT_URL=https://authservice.edmcompany.co.th
 
 ## ยังไม่เสร็จ
 
-- สร้าง/ตรวจสิทธิ์ service user + PAT สำหรับ Management/Admin APIs.
-- ต่อ Actions v2 target (`preaccesstoken`) เข้า Entitlement Service และทดสอบ custom claims
-  end-to-end.
+- Login V2 (หน้า login กลาง): สร้าง SA + PAT บทบาท `IAM_LOGIN_CLIENT` → ใส่ `LOGIN_CLIENT_PAT`
+  ใน `.env` → `docker compose --profile login up -d login` → เพิ่ม nginx location
+  `/ui/v2/login` (ดูด้านบน) → เปิด "Use new login UI" ที่ OIDC app — ดู
+  `docs/PRETEST-PHASE1-STATUS-AND-ESIGN-PLAN.md` §4–5.
 - ตั้ง access-token lifetime 10 นาที และกำหนด refresh-token idle/absolute policy.
 - ลงทะเบียนและทดสอบ Passkey/biometric login.
 - Cloudflare Tunnel มีข้อจำกัดเรื่องการ force HTTP/2 ไป origin ตามเอกสาร Zitadel;
