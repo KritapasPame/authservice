@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { requireAuth, canManageTenant } from '../../http/auth'
-import { inviteUser, getUser, setStatus } from './service'
+import { inviteUser, getUser, setStatus, addCompany, removeCompany } from './service'
 
 export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
   .post('/invite', async ({ auth, body, set }) => {
@@ -20,3 +20,20 @@ export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
     if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
     return setStatus(user.id, body.status)
   }, { body: t.Object({ status: t.Union([t.Literal('active'), t.Literal('disabled')]) }) })
+  .post('/:id/companies', async ({ auth, params, body, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    try {
+      return await addCompany(user, body.companyId)
+    } catch (e: any) {
+      if (e?.invalidCompany !== undefined) { set.status = 400; return { invalidCompany: e.invalidCompany } }
+      throw e
+    }
+  }, { body: t.Object({ companyId: t.Number() }) })
+  .delete('/:id/companies/:companyId', async ({ auth, params, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    return removeCompany(user.id, Number(params.companyId))
+  })

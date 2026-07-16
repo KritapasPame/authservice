@@ -42,3 +42,17 @@ export async function setStatus(id: number, status: string) {
   await db.update(users).set({ status }).where(eq(users.id, id))
   return { ok: true }
 }
+
+export async function addCompany(user: { id: number; tenantId: number }, companyId: number) {
+  const [c] = await db.select().from(companies).where(and(eq(companies.id, companyId), eq(companies.tenantId, user.tenantId)))
+  if (!c) throw { invalidCompany: companyId }
+  await db.insert(userCompanies).values({ userId: user.id, companyId }).onConflictDoNothing()
+  return { ok: true }
+}
+
+// ถอน membership แล้วลบ role ที่ scope company นั้นด้วย — กัน role ผีกลับมาทำงานถ้า add membership กลับ
+export async function removeCompany(userId: number, companyId: number) {
+  await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.companyId, companyId)))
+  await db.delete(userCompanies).where(and(eq(userCompanies.userId, userId), eq(userCompanies.companyId, companyId)))
+  return { ok: true }
+}
