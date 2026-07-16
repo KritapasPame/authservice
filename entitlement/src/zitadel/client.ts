@@ -8,7 +8,8 @@ const call = (path: string, body: unknown) => fetch(env.ZITADEL_MGMT_URL + path,
 export const createZitadelOrg = (name: string) => call('/v2/organizations', { name }).then((r: any) => r.organizationId)
 export const createZitadelUser = (orgId: string, email: string) =>
   // profile เป็น field บังคับของ AddHumanUser — ยังไม่มีชื่อจริงตอน invite ใช้ email local-part ไปก่อน user แก้เองทีหลังได้
-  call('/v2/users/human', { organization: { orgId }, profile: { givenName: email.split('@')[0], familyName: email.split('@')[0] }, email: { email, isVerified: false }, username: email })
+  // isVerified: true — invite flow แอดมินกรอก email เอง (ไม่มี SMTP บน pretest ด้วย); self-signup ในอนาคตต้อง verify จริงใน flow ตัวเอง
+  call('/v2/users/human', { organization: { orgId }, profile: { givenName: email.split('@')[0], familyName: email.split('@')[0] }, email: { email, isVerified: true }, username: email })
     .then((r: any) => r.userId)
 
 // events search (Admin API) — POST {mgmt}/admin/v1/events/_search, requires IAM_OWNER_VIEWER/IAM_OWNER role on the PAT.
