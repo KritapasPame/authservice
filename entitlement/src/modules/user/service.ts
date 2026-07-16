@@ -1,7 +1,7 @@
 import { db } from '../../db/client'
 import { users, userCompanies, userRoles, roles, tenants, companies } from '../../db/schema'
 import { createZitadelUser } from '../../zitadel/client'
-import { isSuperadmin } from '../../http/auth'
+import { canManageTenant } from '../../http/auth'
 import { eq, inArray, isNull, or, and } from 'drizzle-orm'
 import type { InviteUserInput } from '@platform/contracts'
 
@@ -23,13 +23,9 @@ export async function inviteUser(i: InviteUserInput, callerClaims: Record<string
   const rs = i.roleSlugs.length
     ? await db.select().from(roles).where(and(inArray(roles.slug, i.roleSlugs), or(isNull(roles.tenantId), eq(roles.tenantId, i.tenantId))))
     : []
-  // privilege-escalation guard: attaching a grantAll role ('*' access) requires the caller to already hold '*' (or be superadmin)
+  // privilege-escalation guard: แนบ role grantAll ('*') ได้เฉพาะ caller ที่ถือ '*' อยู่แล้ว (หรือ superadmin)
   const escalating = rs.filter(r => r.grantAll)
-  if (escalating.length) {
-    const callerHasStar = callerClaims['urn:platform:tenantId'] === i.tenantId &&
-      Object.values(callerClaims['urn:platform:grants'] ?? {}).some((g: any) => g.permissions.includes('*'))
-    if (!isSuperadmin(callerClaims) && !callerHasStar) throw { forbiddenRole: escalating.map(r => r.slug) }
-  }
+  if (escalating.length && !canManageTenant(callerClaims, i.tenantId)) throw { forbiddenRole: escalating.map(r => r.slug) }
   const zid = await createZitadelUser(tenant.zitadelOrgId, i.email)
   const [u] = await db.insert(users).values({ zitadelUserId: zid, tenantId: i.tenantId, email: i.email }).returning()
   if (companyIds.length) await db.insert(userCompanies).values(companyIds.map(companyId => ({ userId: u.id, companyId })))

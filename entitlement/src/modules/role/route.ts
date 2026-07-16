@@ -1,12 +1,9 @@
 import { Elysia, t } from 'elysia'
-import { requireAuth, isSuperadmin } from '../../http/auth'
+import { requireAuth, isSuperadmin, canManageTenant } from '../../http/auth'
 import { createRole, getRole, assignPermissions, listRoles } from './service'
 
-// role management guard — superadmin OR (same tenant AND holds a grant_all '*' grant, e.g. group_admin)
-// V1 simplification: only '*' grants pass, no fine-grained tenant.user.manage check here (noted for security review)
-const canManageTenant = (claims: Record<string, any>, tenantId: number) =>
-  isSuperadmin(claims) || (claims['urn:platform:tenantId'] === tenantId &&
-    Object.values(claims['urn:platform:grants'] ?? {}).some((g: any) => g.permissions.includes('*')))
+// role management: canManageTenant แบบไม่ส่ง perm = เฉพาะ '*' ผ่าน
+// (V1 simplification — no fine-grained tenant.user.manage check here, noted for security review)
 
 export const roleRouter = new Elysia({ prefix: '/roles' }).use(requireAuth)
   .post('/', ({ auth, body, set }) => {

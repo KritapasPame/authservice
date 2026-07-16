@@ -15,6 +15,12 @@ export const requireAuth = new Elysia({ name: 'requireAuth' }).derive({ as: 'sco
 })
 
 export const isSuperadmin = (c: Record<string, any>) => c['urn:platform:role'] === 'superadmin'
+// tenant-scoped management guard — superadmin หรือ (tenant ตรง + grant ไหนก็ได้ถือ '*' หรือ perm ที่ระบุ)
+// ไม่ส่ง perm = เฉพาะ '*' ผ่าน (role management / grantAll escalation ใช้แบบนี้)
+export const canManageTenant = (c: Record<string, any>, tenantId: number, perm?: string) =>
+  isSuperadmin(c) || (c['urn:platform:tenantId'] === tenantId &&
+    Object.values(c['urn:platform:grants'] ?? {}).some((g: any) =>
+      g.permissions.includes('*') || (perm !== undefined && g.permissions.includes(perm))))
 export const getGrant = (c: Record<string, any>, companyId: number) =>
   (c['urn:platform:grants'] ?? {})[String(companyId)] ?? { roles: [], permissions: [] }
 export const can = (c: Record<string, any>, companyId: number, perm: string) => {
