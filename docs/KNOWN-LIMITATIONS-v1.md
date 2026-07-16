@@ -37,9 +37,11 @@ V2 task #1 เสร็จแล้ว (ดู spec `docs/superpowers/specs/2026
 - ~~ต้อง copy auth.ts~~ → ✅ ปิดแล้ว (2026-07-16): แยกเป็น package `@platform/auth`
   (`createRequireAuth` factory + helpers) แจกจ่ายเป็น tarball บนเครื่อง pre-test —
   ดู `docs/PACKAGE-DISTRIBUTION.md`
-- consumer **ต้องจำ**: `can()` ไม่ bound ด้วย module — ต้องเรียก `hasModule()` คู่เสมอ
-  (grant_all → `['*']` ผ่าน can ได้แม้ module ปิด) — พิจารณา filter `'*'` ด้วย enabled modules
-  ฝั่ง server ใน V2
+- ~~consumer ต้องจำ can()+hasModule() คู่~~ → ✅ ลดความเสี่ยงแล้ว (2026-07-16): เพิ่ม
+  `canUse(claims, companyId, moduleKey, perm)` ใน `@platform/auth` เป็น API หลักฝั่ง product
+  (เช็ค module + permission จบในตัว) — `can()` ยังไม่ bound ด้วย module เหมือนเดิม ใช้เฉพาะ
+  internal; filter `'*'` ฝั่ง server จริงยังทำไม่ได้เพราะ permission key ไม่ได้ prefix ด้วย
+  module key ทุกตัว (เช่น `employee.read` อยู่ module hr) — ถ้าจะทำใน V2 ต้อง rename key ก่อน
 
 ## Social login (Google / Apple ID) — ยังไม่เปิด, เปิดหลังเทส flow หลักผ่าน
 

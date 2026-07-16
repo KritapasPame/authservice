@@ -27,5 +27,8 @@ export const getGrant = (c: Record<string, any>, companyId: number) =>
 export const can = (c: Record<string, any>, companyId: number, perm: string) => {
   const g = getGrant(c, companyId); return g.permissions.includes('*') || g.permissions.includes(perm)
 }
-// '*' จาก grant_all ไม่ถูกกรองด้วย module — service ปลายทางต้องเช็ค hasModule ควบคู่กับ can เสมอ
+// '*' จาก grant_all ไม่ถูกกรองด้วย module — can() เดี่ยวๆ จึงทะลุ module ที่ tenant ไม่ได้เปิดได้
 export const hasModule = (c: Record<string, any>, key: string) => (c['urn:platform:modules'] ?? []).includes(key)
+// API หลักสำหรับฝั่ง product (eSign, HR, ...) — เช็ค module + permission จบในตัวเดียว ลืม hasModule ไม่ได้
+export const canUse = (c: Record<string, any>, companyId: number, moduleKey: string, perm: string) =>
+  hasModule(c, moduleKey) && can(c, companyId, perm)
