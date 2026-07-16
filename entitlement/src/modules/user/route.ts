@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { requireAuth, canManageTenant } from '../../http/auth'
-import { inviteUser, getUser, setStatus, addCompany, removeCompany, assignRole } from './service'
+import { inviteUser, getUser, setStatus, addCompany, removeCompany, assignRole, revokeRole } from './service'
 
 export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
   .post('/invite', async ({ auth, body, set }) => {
@@ -41,6 +41,17 @@ export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
       if (e?.notFound) { set.status = 404; return `${e.notFound} not found` }
       if (e?.invalidCompany !== undefined) { set.status = 400; return { invalidCompany: e.invalidCompany } }
       if (e?.forbiddenRole) { set.status = 403; return { forbiddenRole: e.forbiddenRole } }
+      throw e
+    }
+  }, { body: t.Object({ roleSlug: t.String(), companyId: t.Optional(t.Number()) }) })
+  .delete('/:id/roles', async ({ auth, params, body, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    try {
+      return await revokeRole(user, body.roleSlug, body.companyId ?? null)
+    } catch (e: any) {
+      if (e?.notFound) { set.status = 404; return `${e.notFound} not found` }
       throw e
     }
   }, { body: t.Object({ roleSlug: t.String(), companyId: t.Optional(t.Number()) }) })

@@ -65,6 +65,14 @@ export async function assignRole(user: { id: number; tenantId: number }, roleSlu
   return { ok: true }
 }
 
+export async function revokeRole(user: { id: number; tenantId: number }, roleSlug: string, companyId: number | null) {
+  const matches = await db.select().from(roles).where(and(eq(roles.slug, roleSlug), or(isNull(roles.tenantId), eq(roles.tenantId, user.tenantId))))
+  if (!matches.length) throw { notFound: 'role' }
+  await db.delete(userRoles).where(and(eq(userRoles.userId, user.id), inArray(userRoles.roleId, matches.map(r => r.id)),
+    companyId === null ? isNull(userRoles.companyId) : eq(userRoles.companyId, companyId)))
+  return { ok: true }
+}
+
 // ถอน membership แล้วลบ role ที่ scope company นั้นด้วย — กัน role ผีกลับมาทำงานถ้า add membership กลับ
 export async function removeCompany(userId: number, companyId: number) {
   await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.companyId, companyId)))
