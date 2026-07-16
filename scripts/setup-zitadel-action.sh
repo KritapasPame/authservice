@@ -7,14 +7,14 @@
 #     [ZITADEL_URL] [TARGET_ENDPOINT]
 #
 #   ZITADEL_URL      default: https://authservice.edmcompany.co.th
-#   TARGET_ENDPOINT  default: http://host.docker.internal:3000/internal/zitadel/token-claims
-#                    (ถ้า entitlement เข้า compose แล้ว ใช้ http://entitlement:3000/internal/zitadel/token-claims)
+#   TARGET_ENDPOINT  default: http://entitlement:3000/internal/zitadel/token-claims (compose network)
+#                    (host-only dev: http://host.docker.internal:3000/internal/zitadel/token-claims)
 #
 # สำคัญ: signingKey โชว์ครั้งเดียวตอนสร้าง target — เอาไปใส่ env ZITADEL_ACTIONS_SIGNING_KEY ของ entitlement ทันที
 set -euo pipefail
 
 ZITADEL_URL="${1:-https://authservice.edmcompany.co.th}"
-TARGET_ENDPOINT="${2:-http://host.docker.internal:3000/internal/zitadel/token-claims}"
+TARGET_ENDPOINT="${2:-http://entitlement:3000/internal/zitadel/token-claims}"
 : "${ZITADEL_PAT:?ต้องตั้ง env ZITADEL_PAT (service user PAT ที่มีสิทธิ์ instance actions)}"
 
 auth=(-H "Authorization: Bearer $ZITADEL_PAT" -H "Content-Type: application/json")

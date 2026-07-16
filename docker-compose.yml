@@ -36,10 +36,10 @@ services:
       ZITADEL_TLS_ENABLED: "true"
       ZITADEL_TLS_CERTPATH: /etc/zitadel/tls/origin.pem
       ZITADEL_TLS_KEYPATH: /etc/zitadel/tls/origin-key.pem
-      # v4 defaults new instances to Login V2 (separate Next.js container + reverse proxy).
-      # We stay on the bundled legacy login UI (served at :8080/ui/login) to keep this
-      # compose file to the brief's 3 services — no Traefik, no extra login container.
+      # compose brief: db + redis + zitadel + entitlement (legacy login UI, no Login V2 container).
       ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+      # Allow Actions v2 target to reach entitlement on the compose network (private CIDR).
+      ZITADEL_HTTPCLIENT_DENYLIST: "169.254.0.0/16,100.64.0.0/10,0.0.0.0/8"
     depends_on:
       db:
         condition: service_healthy
@@ -48,6 +48,34 @@ services:
     networks:
       - default
       - proxy
+
+  entitlement:
+    build:
+      context: .
+      dockerfile: entitlement/Dockerfile
+    env_file:
+      - ./entitlement/.env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/entitlement
+      PORT: "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "3020:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "const r=await fetch('http://127.0.0.1:3000/health'); if(!r.ok) process.exit(1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 networks:
   default:
