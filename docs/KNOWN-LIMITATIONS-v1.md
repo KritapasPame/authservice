@@ -34,9 +34,9 @@ V2 task #1 เสร็จแล้ว (ดู spec `docs/superpowers/specs/2026
   โดยให้ Entitlement เป็น source of truth เพียงชุดเดียว (ดู design spec §3a).
 
 ## eSign integration (client ตัวแรก) — สิ่งที่จะเจอทันที
-- `getGrant`/`can`/`hasModule` + `requireAuth` อยู่ใน `entitlement/src/http/auth.ts` แต่
-  `@platform/contracts` เป็น **types-only** → eSign import logic ไม่ได้ ต้อง copy `auth.ts`
-  → **V2 task**: ย้าย helper + requireAuth ไป `@platform/auth` (หรือใส่ใน contracts package)
+- ~~ต้อง copy auth.ts~~ → ✅ ปิดแล้ว (2026-07-16): แยกเป็น package `@platform/auth`
+  (`createRequireAuth` factory + helpers) แจกจ่ายเป็น tarball บนเครื่อง pre-test —
+  ดู `docs/PACKAGE-DISTRIBUTION.md`
 - consumer **ต้องจำ**: `can()` ไม่ bound ด้วย module — ต้องเรียก `hasModule()` คู่เสมอ
   (grant_all → `['*']` ผ่าน can ได้แม้ module ปิด) — พิจารณา filter `'*'` ด้วย enabled modules
   ฝั่ง server ใน V2

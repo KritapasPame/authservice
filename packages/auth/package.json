@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src"
+  ],
   "dependencies": {
     "jose": "^6.2.3"
   },
