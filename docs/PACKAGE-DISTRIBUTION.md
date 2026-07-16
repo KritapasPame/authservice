@@ -45,10 +45,20 @@ server {
 }
 ```
 
+nginx บนเครื่อง pre-test รันเป็น docker — ต้อง mount 2 อย่างเข้าคอนเทนเนอร์
+(path ปลายทางของ htpasswd ต้องตรงกับ `auth_basic_user_file` ข้างบนเป๊ะ):
+
+```yaml
+# ใน service nginx ของ compose
+    volumes:
+      - ./htpasswd-packages:/etc/nginx/.htpasswd-packages:ro
+      - ./packages:/var/www/packages:ro   # โฟลเดอร์บน host ที่ scp .tgz เข้าไป
+```
+
 ```bash
-# สร้าง credential ให้ทีม eSign (ทำครั้งเดียว)
-htpasswd -c /etc/nginx/.htpasswd-packages esign
-nginx -s reload
+# สร้าง credential ให้ทีม eSign (ทำครั้งเดียว — ใช้ docker ไม่ต้องลง apache2-utils)
+docker run --rm httpd:alpine htpasswd -nb esign '<password>' > htpasswd-packages
+docker compose exec nginx nginx -s reload
 ```
 
 ## ฝั่ง eSign — ติดตั้ง

@@ -24,9 +24,10 @@ docker compose up -d db redis zitadel
 
 - [ ] server block หลัก (`grpc_pass grpc://zitadel:8080`) — ตามที่ตั้งอยู่แล้ว
 - [ ] เพิ่ม `location /packages/` (static + basic auth) สำหรับแจก `@platform/auth` —
-  **config เต็มพร้อม copy อยู่ใน `docs/PACKAGE-DISTRIBUTION.md`**
-- [ ] `mkdir -p /var/www/packages && htpasswd -c /etc/nginx/.htpasswd-packages esign`
-- [ ] `nginx -t && nginx -s reload`
+  **config เต็ม + volume mounts (nginx เป็น docker) พร้อม copy อยู่ใน `docs/PACKAGE-DISTRIBUTION.md`**
+- [ ] `mkdir -p ./packages` ข้าง compose + สร้าง htpasswd:
+  `docker run --rm httpd:alpine htpasswd -nb esign '<password>' > htpasswd-packages`
+- [ ] `docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload`
 
 ## 3. Zitadel one-time setup (Console)
 
@@ -58,7 +59,7 @@ docker compose up -d db redis zitadel
 
 ## 6. วาง package ให้ eSign
 
-- [ ] `./scripts/pack-auth.sh` (ในเครื่อง dev) → `scp dist-packages/platform-auth-1.1.0.tgz <server>:/var/www/packages/`
+- [ ] `./scripts/pack-auth.sh` (ในเครื่อง dev) → `scp dist-packages/platform-auth-1.1.0.tgz <server>:<dir ของ compose>/packages/`
 - [ ] ทดสอบ: `curl -u esign:<pass> -I https://authservice.edmcompany.co.th/packages/platform-auth-1.1.0.tgz` → 200
 - [ ] ส่ง URL + credential + ตัวอย่างโค้ด (`docs/PACKAGE-DISTRIBUTION.md`) ให้ทีม eSign
   — ย้ำให้ใช้ **`canUse()`** ไม่ใช่ `can()` เดี่ยวๆ
