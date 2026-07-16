@@ -28,6 +28,10 @@ def main() -> None:
         default="https://authservice.edmcompany.co.th",
         help="OIDC issuer URL",
     )
+    parser.add_argument(
+        "--token-file",
+        help="Write the access token to this file, chmod 600 (for operator API testing, e.g. LOGIN-E2E-TEST.md Stage 4). Never commit it.",
+    )
     args = parser.parse_args()
 
     issuer = args.issuer.rstrip("/")
@@ -130,6 +134,12 @@ def main() -> None:
         raise SystemExit(f"Could not decode access token payload: {error}") from None
 
     print("\nLogin succeeded.")
+    if args.token_file:
+        import os
+        with open(args.token_file, "w") as f:
+            f.write(access_token + "\n")
+        os.chmod(args.token_file, 0o600)
+        print(f"access token written to {args.token_file}")
     print("aud =", json.dumps(payload.get("aud")))
     print("iss =", payload.get("iss"))
     print("sub =", payload.get("sub"))
