@@ -3,17 +3,18 @@
 > จากผล final whole-branch review (T15, 2026-07-15). สิ่งเหล่านี้ **จงใจเลื่อน** ออกจาก V1
 > ไม่ใช่ bug ที่ลืม — บันทึกไว้ให้ operator/ผู้ integrate เห็นชัด และเป็น backlog ของ V2.
 
-## Write API ยังไม่ครบ spec §6 (per-company role management)
-- `POST /users/invite` แนบ role ได้แบบ **tenant-wide เท่านั้น** (`user_roles.company_id = null`).
-  ยัง**ไม่มี** endpoint สำหรับ:
-  - assign role ให้ user ที่มีอยู่แล้ว แบบ scope ต่อ company (เคส Somchai = admin ที่ A, HR ที่ B
-    ปัจจุบันต้อง **insert `user_roles` ตรงใน DB**)
-  - ปิดผู้ใช้ (`users.status = 'disabled'`) — resolver เช็ค status แล้ว แต่ยังไม่มี API set
-  - ถอน role / ถอน company ออกจาก user
-- claims resolver รองรับ per-company grant เต็มแล้ว — ขาดแค่ฝั่ง write API
-- **V2 task #1**: เพิ่ม `POST /users/:id/roles { roleSlug, companyId }` + `PATCH /users/:id/status` +
-  ตอน assign **ต้อง re-validate** ว่า role อยู่ system∪tenant เดียวกัน และ company อยู่ใน tenant
-  (resolver เชื่อ invariant นี้จาก write path — ดู comment ใน resolver.ts)
+## Write API per-company role management — ✅ ปิดแล้ว (2026-07-16)
+
+V2 task #1 เสร็จแล้ว (ดู spec `docs/superpowers/specs/2026-07-16-per-company-role-management-design.md`):
+- `POST /users/:id/roles { roleSlug, companyId? }` — assign role ต่อ company (companyId ต้องเป็น
+  company ที่ user เป็นสมาชิกใน `user_companies` แล้ว) หรือ tenant-wide (ไม่ส่ง companyId)
+- `DELETE /users/:id/roles { roleSlug, companyId? }` — ถอน role ตาม scope
+- `POST /users/:id/companies` / `DELETE /users/:id/companies/:companyId` — จัดการ membership
+  บริษัทในเครือ (ถอนแล้ว cascade ลบ role ที่ scope company นั้น)
+- `PATCH /users/:id/status { active|disabled }` — ปิด/เปิดผู้ใช้
+- ทุกตัว re-validate: role ∈ system∪tenant, company ∈ tenant, grantAll escalation guard เดียวกับ invite
+- ที่เหลือของเดิม: `POST /users/invite` ยังแนบ role แบบ tenant-wide เท่านั้น (ตั้งใจ — invite แล้ว
+  assign per-company ต่อด้วย endpoint ใหม่)
 
 ## Deployment / ops
 - Entitlement Service **ยังไม่ containerized** — `docker-compose.yml` มีแค่ db/redis/zitadel,
@@ -36,8 +37,6 @@
 - `getGrant`/`can`/`hasModule` + `requireAuth` อยู่ใน `entitlement/src/http/auth.ts` แต่
   `@platform/contracts` เป็น **types-only** → eSign import logic ไม่ได้ ต้อง copy `auth.ts`
   → **V2 task**: ย้าย helper + requireAuth ไป `@platform/auth` (หรือใส่ใน contracts package)
-- guard `canManageTenant` ถูก copy 3 ที่ (company/user/role route) ต่างกันแค่ permission key —
-  ตอนแตะครั้งหน้าให้รวมเป็น helper เดียวข้าง `isSuperadmin`
 - consumer **ต้องจำ**: `can()` ไม่ bound ด้วย module — ต้องเรียก `hasModule()` คู่เสมอ
   (grant_all → `['*']` ผ่าน can ได้แม้ module ปิด) — พิจารณา filter `'*'` ด้วย enabled modules
   ฝั่ง server ใน V2

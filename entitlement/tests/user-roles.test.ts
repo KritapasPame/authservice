@@ -162,3 +162,33 @@ test('grantAll role: caller ไม่มี * → 403 forbiddenRole, superadmin 
   expect(await res.json()).toEqual({ forbiddenRole: [slug] })
   expect((await req('POST', `/users/${user.id}/roles`, { authorization: superadmin }, { roleSlug: slug })).status).toBe(200)
 })
+
+test('เคสสมชาย: admin ที่ A + HR ที่ B → resolver ออก grants แยกต่อ company', async () => {
+  const { tenant, user } = await makeUserInTenant()
+  const [a] = await db.insert(companies).values({ tenantId: tenant.id, name: 'A' }).returning()
+  const [b] = await db.insert(companies).values({ tenantId: tenant.id, name: 'B' }).returning()
+  const adminSlug = `somchai-admin-${Date.now()}`, hrSlug = `somchai-hr-${Date.now()}`
+  await db.insert(roles).values([{ tenantId: tenant.id, name: 'Admin', slug: adminSlug }, { tenantId: tenant.id, name: 'HR', slug: hrSlug }])
+
+  for (const [companyId, roleSlug] of [[a.id, adminSlug], [b.id, hrSlug]] as const) {
+    expect((await req('POST', `/users/${user.id}/companies`, { authorization: superadmin }, { companyId })).status).toBe(200)
+    expect((await req('POST', `/users/${user.id}/roles`, { authorization: superadmin }, { roleSlug, companyId })).status).toBe(200)
+  }
+
+  const claims = await resolveClaims(user.zitadelUserId) as { grants: Record<string, { roles: string[] }> }
+  expect(claims.grants[String(a.id)].roles).toEqual([adminSlug])
+  expect(claims.grants[String(b.id)].roles).toEqual([hrSlug])
+})
+
+test('guard sweep: caller ถือ tenant.user.manage ของ tenant อื่น → 403 ทุก endpoint ใหม่', async () => {
+  const { tenant, user } = await makeUserInTenant()
+  const alien = managerOf(tenant.id + 9999)
+  const calls: [string, string, unknown?][] = [
+    ['PATCH', `/users/${user.id}/status`, { status: 'disabled' }],
+    ['POST', `/users/${user.id}/companies`, { companyId: 1 }],
+    ['DELETE', `/users/${user.id}/companies/1`, undefined],
+    ['POST', `/users/${user.id}/roles`, { roleSlug: 'x' }],
+    ['DELETE', `/users/${user.id}/roles`, { roleSlug: 'x' }],
+  ]
+  for (const [method, path, body] of calls) expect((await req(method, path, { authorization: alien }, body)).status).toBe(403)
+})
