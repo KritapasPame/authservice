@@ -1,0 +1,15 @@
+{
+  "name": "@platform/auth",
+  "version": "1.0.0",
+  "description": "Shared JWT auth middleware + permission helpers for platform services (entitlement, esign, ...)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "jose": "^6.2.3"
+  },
+  "peerDependencies": {
+    "elysia": ">=1.4.0"
+  }
+}
