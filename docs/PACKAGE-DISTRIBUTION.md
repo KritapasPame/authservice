@@ -65,10 +65,21 @@ docker compose exec nginx nginx -s reload
 
 eSign ใช้ bun + Elysia → ใช้ TS source ใน package ได้ตรงๆ ไม่มี build step:
 
+**แนะนำ: vendor เข้า repo (เหมาะกับ docker build)** — download ครั้งเดียว commit เข้า repo eSign:
+
 ```bash
-bun add https://esign:<password>@authservice.edmcompany.co.th/packages/platform-auth-1.1.0.tgz
-# ถ้า credential-in-URL มีปัญหา: curl -u esign:<password> -O <url> แล้ว bun add file:./platform-auth-1.1.0.tgz
+mkdir -p vendor
+curl -u esign:'<password>' -o vendor/platform-auth-1.1.0.tgz \
+  https://authservice.edmcompany.co.th/packages/platform-auth-1.1.0.tgz
+bun add file:./vendor/platform-auth-1.1.0.tgz
 ```
+
+- docker build ไม่ต้องทำอะไรพิเศษ (`COPY . .` + `bun install` — ไฟล์อยู่ใน context แล้ว)
+  build offline ได้ ไม่ผูกกับ uptime ของเครื่อง pre-test และไม่มี credential ใน repo
+- อัปเดต version: download ไฟล์ใหม่ → `bun add file:./vendor/platform-auth-<new>.tgz` → ลบไฟล์เก่า
+
+**ไม่แนะนำ**: ใส่ URL แบบ `https://esign:<password>@...` ตรงๆ ใน package.json —
+รหัสจะหลุดเข้า git (ทั้ง package.json และ bun.lock) และทุก build ต้องพึ่งเซิร์ฟเวอร์เรา online
 
 ใช้งาน (ค่า env ดู `docs/API-INTEGRATION.md`):
 
