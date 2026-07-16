@@ -133,7 +133,23 @@ def main() -> None:
     print("aud =", json.dumps(payload.get("aud")))
     print("iss =", payload.get("iss"))
     print("sub =", payload.get("sub"))
-    print("\nDo not share the access, ID, or refresh tokens.")
+
+    platform_claims = {k: v for k, v in payload.items() if k.startswith("urn:platform:")}
+    print("\nurn:platform:* claims (custom claims via Actions v2):")
+    if platform_claims:
+        print(json.dumps(platform_claims, indent=2, ensure_ascii=False))
+        print("\nDo not share the access, ID, or refresh tokens.")
+    else:
+        print("  (none)")
+        print(
+            "\nNo platform claims in the access token. Either the user is unprovisioned"
+            " (no `users` row -> {} is correct), or the Actions v2 wiring is incomplete:"
+            "\n  1. target+execution created? (scripts/setup-zitadel-action.sh)"
+            "\n  2. ZITADEL_HTTPCLIENT_DENYLIST override set on the zitadel container?"
+            "\n  3. entitlement running with ZITADEL_ACTIONS_SIGNING_KEY set?"
+            "\n  4. user provisioned in entitlement DB (users + user_companies + user_roles)?"
+        )
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
