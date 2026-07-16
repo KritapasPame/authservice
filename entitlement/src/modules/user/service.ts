@@ -50,6 +50,21 @@ export async function addCompany(user: { id: number; tenantId: number }, company
   return { ok: true }
 }
 
+export async function assignRole(user: { id: number; tenantId: number }, roleSlug: string, companyId: number | null, callerClaims: Record<string, any>) {
+  // system ∪ tenant เดียวกัน (invariant เดียวกับ invite — resolver เชื่อ write path นี้)
+  const matches = await db.select().from(roles).where(and(eq(roles.slug, roleSlug), or(isNull(roles.tenantId), eq(roles.tenantId, user.tenantId))))
+  const role = matches.find(r => r.tenantId !== null) ?? matches[0]  // slug ชนระหว่าง system/tenant → เลือก tenant role
+  if (!role) throw { notFound: 'role' }
+  if (role.grantAll && !canManageTenant(callerClaims, user.tenantId)) throw { forbiddenRole: [role.slug] }
+  if (companyId !== null) {
+    // ต้องเป็นสมาชิก company อยู่แล้ว — resolver สร้าง grant เฉพาะ company ใน user_companies, กัน assign แล้ว no-op เงียบ
+    const [m] = await db.select().from(userCompanies).where(and(eq(userCompanies.userId, user.id), eq(userCompanies.companyId, companyId)))
+    if (!m) throw { invalidCompany: companyId }
+  }
+  await db.insert(userRoles).values({ userId: user.id, roleId: role.id, companyId }).onConflictDoNothing()
+  return { ok: true }
+}
+
 // ถอน membership แล้วลบ role ที่ scope company นั้นด้วย — กัน role ผีกลับมาทำงานถ้า add membership กลับ
 export async function removeCompany(userId: number, companyId: number) {
   await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.companyId, companyId)))
