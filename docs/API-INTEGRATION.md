@@ -1,6 +1,6 @@
 # คู่มือเชื่อมต่อ Auth Service (สำหรับฝั่ง API / App)
 
-> อัปเดตล่าสุด: 2026-07-15
+> อัปเดตล่าสุด: 2026-07-16
 > Environment: EDM pre-test
 > Issuer: `https://authservice.edmcompany.co.th`
 
@@ -27,14 +27,35 @@ https://authservice.edmcompany.co.th/.well-known/openid-configuration
 | Logout (end session) | `https://authservice.edmcompany.co.th/oidc/v1/end_session` |
 | Revoke token | `https://authservice.edmcompany.co.th/oauth/v2/revoke` |
 
-## 2. Login (ฝั่ง frontend / app)
+## 2. Login — สองแบบ (เลือกตาม product)
 
-- Flow: **OIDC Authorization Code + PKCE** (ห้ามใช้ implicit)
-- Scopes: `openid profile email` และเพิ่ม `offline_access` ถ้าต้องการ refresh token
-- **Redirect URI ต้องแจ้งทีม Auth ให้ลงทะเบียนใน Zitadel ก่อน** ไม่งั้น login จะ error
-  ตอน authorize — แจ้งทั้ง URI ของ dev/pre-test/prod
-- ใช้ OIDC library มาตรฐานของแต่ละ platform ได้เลย (เช่น `oidc-client-ts`,
-  AppAuth, `openid-client`) โดย config แค่ issuer + client ID + redirect URI
+### 2a. Custom Login UI บน app ของคุณ (V1 eSign — **ใช้แบบนี้**)
+
+End user **ไม่เห็น** หน้า login ของ Zitadel (`/ui/login`) — เห็นแค่ UI ของ app
+
+1. ตั้ง **Custom Login URL** ใน OIDC application (ทีม Auth ทำให้) ชี้ไป origin ของ app เช่น `https://esign.example.com`
+2. App redirect browser ไป authorize ตามปกติ (PKCE)
+3. Zitadel redirect กลับมา `/login?authRequest=V2_...` บน app
+4. **Backend ของ app** (ถือ PAT บทบาท `IAM_LOGIN_CLIENT`) เรียก Session API + finalize auth request
+5. Redirect ไป callback พร้อม code → แลก token
+
+เอกสาร Zitadel: [Custom Login UI — OIDC](https://zitadel.com/docs/guides/integrate/login-ui/oidc-standard)
+
+**ลำดับงาน Phase 1–4 (Zitadel vs eSign + อ้างอิงครบ):** `docs/PRETEST-PHASE1-STATUS-AND-ESIGN-PLAN.md` §5
+
+env เพิ่มฝั่ง backend ของ app:
+
+```env
+ZITADEL_LOGIN_CLIENT_PAT=<PAT จากทีม Auth — IAM_LOGIN_CLIENT>
+```
+
+**ห้าม** ใส่ PAT ใน frontend / mobile bundle
+
+### 2b. Hosted login redirect (ไม่ใช้สำหรับ eSign V1)
+
+Library OIDC มาตรฐาน redirect ไป `/oauth/v2/authorize` แล้ว user เห็นหน้า IdP — **eSign ไม่ใช้แนวนี้**
+
+---
 
 ## 3. ตรวจ token (ฝั่ง backend API)
 
@@ -58,8 +79,7 @@ user id ของผู้ใช้ = claim `sub`
 
 ## 4. Custom claims (สิทธิ์ / tenant)
 
-> **สถานะ: ยังไม่เปิดใช้บน pre-test** — ต้องต่อ Actions v2 target เข้า Entitlement
-> Service ก่อน จะแจ้งอีกครั้งเมื่อ live
+> **สถานะ: live บน pre-test (2026-07-16)** — ต่อ Actions v2 + entitlement แล้ว; ทดด้วย `scripts/oidc-pkce-test.py`
 
 เมื่อเปิดใช้แล้ว access token จะมี claims prefix `urn:platform:`:
 
@@ -77,8 +97,9 @@ User ที่ยังไม่ถูก provision ในระบบ entitleme
 ## 5. สิ่งที่ต้องแจ้งกลับทีม Auth
 
 1. **Redirect URIs** ทั้งหมด (รวม logout redirect ถ้ามี) ของทุก environment
-2. **ค่า `aud`** ที่เห็นใน token หลังทดสอบ login ครั้งแรก (เพื่อ confirm ตรงกัน)
-3. Platform ของ app (web SPA / mobile / server-side) ถ้ายังไม่ได้แจ้ง
+2. **Custom Login base URL** (origin ของ app ที่ host หน้า `/login?authRequest=...`)
+3. **ค่า `aud`** ที่เห็นใน token หลังทดสอบ login ครั้งแรก (เพื่อ confirm ตรงกัน)
+4. Platform ของ app (web SPA / mobile / server-side) ถ้ายังไม่ได้แจ้ง
 
 ## 6. ทดสอบ
 
@@ -87,8 +108,7 @@ User ที่ยังไม่ถูก provision ในระบบ entitleme
 
 ## ข้อจำกัดปัจจุบัน (pre-test)
 
-- Custom claims (`urn:platform:*`) ยังไม่ live (ดู §4)
+- ~~Custom claims (`urn:platform:*`) ยังไม่ live~~ → **live แล้ว** (ดู §4)
 - Access token lifetime ยังเป็นค่า default — จะปรับเป็น 10 นาที + refresh token policy
-- Passkey/biometric login ยังไม่เปิดใช้
-- **Social login (Google / Apple ID) ยังไม่เปิดใช้** — จะเปิดภายหลังโดย**ฝั่ง client
-  ไม่ต้องแก้โค้ด** (ปุ่มจะโผล่บนหน้า login ของ Auth Service เอง ผ่าน OIDC flow เดิม)
+- Passkey/biometric — ทำบน custom login UI ผ่าน Session API (Phase B)
+- **Social login (Google / Apple ID)** — เปิดที่ Zitadel แล้ว implement ปุ่มบน custom login UI ของ app (ไม่ใช่หน้า `/ui/login`)
