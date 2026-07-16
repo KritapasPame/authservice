@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
 import { requireAuth, canManageTenant } from '../../http/auth'
-import { inviteUser } from './service'
+import { inviteUser, getUser, setStatus } from './service'
 
 export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
   .post('/invite', async ({ auth, body, set }) => {
@@ -14,3 +14,9 @@ export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
       throw e
     }
   }, { body: t.Object({ tenantId: t.Number(), email: t.String({ format: 'email' }), companyIds: t.Array(t.Number()), roleSlugs: t.Array(t.String()) }) })
+  .patch('/:id/status', async ({ auth, params, body, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    return setStatus(user.id, body.status)
+  }, { body: t.Object({ status: t.Union([t.Literal('active'), t.Literal('disabled')]) }) })

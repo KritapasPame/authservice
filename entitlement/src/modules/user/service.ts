@@ -32,3 +32,13 @@ export async function inviteUser(i: InviteUserInput, callerClaims: Record<string
   if (rs.length) await db.insert(userRoles).values(rs.map(r => ({ userId: u.id, roleId: r.id, companyId: null })))
   return u
 }
+
+export async function getUser(id: number) {
+  const [u] = await db.select().from(users).where(eq(users.id, id))
+  return u
+}
+
+export async function setStatus(id: number, status: string) {
+  await db.update(users).set({ status }).where(eq(users.id, id))
+  return { ok: true }
+}
