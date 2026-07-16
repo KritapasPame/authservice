@@ -44,6 +44,9 @@
 | 8 | `(none)` claims แต่ login ได้ | `sub` ไม่ตรง `platform_admins` / ไม่ provision | insert ด้วย **`sub` ของ user ที่ login จริง** |
 | 9 | ไม่ขึ้นหน้า login / ได้ zitadel-admin ตลอด | session cookie ค้าง | incognito หรือ `prompt=login`; login human user แยกจาก bootstrap admin |
 | 10 | `Errors.App.NotFound` | Client ID ผิด / redirect URI ไม่ลงทะเบียน | copy Client ID จาก Console + ใส่ `http://127.0.0.1:8787/callback` |
+| 11 | entitlement API ตอบ `{"error":"internal"}` แต่ log เป็น 401 | `ZITADEL_AUDIENCE` ไม่ตรง `aud` ใน token | ตั้งเป็น **Project ID** (ดูจากบรรทัด `aud =` ของ oidc-pkce-test) แล้ว restart entitlement |
+| 12 | invite ตาย: `AddHumanUserRequest.Profile: value is required` | Zitadel v2 บังคับ profile | แก้แล้ว (commit 71c5ebf) — `createZitadelUser` ใส่ givenName/familyName จาก email |
+| 13 | login user ใหม่ติดหน้า E-Mail Verification | pretest ไม่มี SMTP — code ไม่ถูกส่ง | แก้แล้ว (f36d9bb): invite สร้างแบบ verified; user เก่าติ๊ก Verified ใน Console ได้ |
 
 ---
 

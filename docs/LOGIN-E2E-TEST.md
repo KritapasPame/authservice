@@ -3,7 +3,8 @@
 > สถานะตั้งต้น: มี project + application (eSign) ใน Zitadel แล้ว ได้ Client ID + redirect URI
 > หลักคิด: **ไม่ต้องรอสร้าง user ใหม่** — Zitadel admin (คนที่ใช้เข้า Console) เป็น human user
 > อยู่แล้ว ใช้ login เทสได้ทุกสเตจ แต่ละสเตจ fail ตรงไหน = รู้ทันทีว่าอะไรยังไม่ต่อ
-> อัปเดตล่าสุด: 2026-07-16 (Stage 0 ผ่านครบจากภายนอกแล้ว)
+> อัปเดตล่าสุด: 2026-07-17 — **Stage 0–4 ผ่านครบแล้ว** 🎉 (tenant 1 "EDM Test", company 1,
+> test-user@edmcompany.co.th ได้ claims เต็ม: tenantId/companies/modules/grants ตรง expected ทุก field)
 
 ## Stage 0: Public surface (ไม่ต้อง login) — ✅ ผ่านแล้ว 2026-07-16
 

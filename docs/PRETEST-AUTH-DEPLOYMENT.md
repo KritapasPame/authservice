@@ -139,7 +139,7 @@ curl -s https://authservice.edmcompany.co.th/oauth/v2/keys
 ```env
 ZITADEL_ISSUER=https://authservice.edmcompany.co.th
 ZITADEL_JWKS_URL=https://authservice.edmcompany.co.th/oauth/v2/keys
-ZITADEL_AUDIENCE=<ค่า aud จาก JWT access token>
+ZITADEL_AUDIENCE=<ค่า aud จาก JWT access token — คือ Project ID ของ project ที่ app สังกัด>
 ZITADEL_MGMT_URL=https://authservice.edmcompany.co.th
 ```
 
