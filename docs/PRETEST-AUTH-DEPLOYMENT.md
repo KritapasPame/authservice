@@ -133,6 +133,8 @@ curl -s https://authservice.edmcompany.co.th/oauth/v2/keys
 - สร้าง OIDC Web application, Authorization Code + PKCE สำเร็จ.
 - ตั้ง Access Token Type = JWT และทดสอบ code exchange/อ่าน `aud`, `iss`, `sub`
   ด้วย `scripts/oidc-pkce-test.py` สำเร็จ.
+- Token lifetimes ตั้งผ่าน Admin API (`PUT /admin/v1/settings/oidc`): access/id 600s,
+  refresh idle 30d / absolute 90d — verify จาก token จริง `exp-iat=600` (2026-07-17).
 
 ## ค่าฝั่ง API
 
@@ -152,7 +154,6 @@ ZITADEL_MGMT_URL=https://authservice.edmcompany.co.th
   ใน `.env` → `docker compose --profile login up -d login` → เพิ่ม nginx location
   `/ui/v2/login` (ดูด้านบน) → เปิด "Use new login UI" ที่ OIDC app — ดู
   `docs/PRETEST-PHASE1-STATUS-AND-ESIGN-PLAN.md` §4–5.
-- ตั้ง access-token lifetime 10 นาที และกำหนด refresh-token idle/absolute policy.
 - ลงทะเบียนและทดสอบ Passkey/biometric login.
 - Cloudflare Tunnel มีข้อจำกัดเรื่องการ force HTTP/2 ไป origin ตามเอกสาร Zitadel;
   Console และ OIDC browser flow ผ่านแล้ว แต่ต้องทดสอบ native gRPC client แยกก่อนถือว่า
