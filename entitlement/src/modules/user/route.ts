@@ -81,6 +81,7 @@ export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
     catch (e: any) {
       if (e?.invalidCompany !== undefined) { set.status = 400; return { invalidCompany: e.invalidCompany } }
       if (e?.missing) { set.status = 404; return { missing: e.missing } }
+      if (e?.forbiddenKeys) { set.status = 403; return { forbiddenKeys: e.forbiddenKeys } }  // management key ปฏิเสธเสมอ — สิทธิ์นี้ให้ผ่าน admin flag เท่านั้น
       if (e?.overPackage) { set.status = 400; return { overPackage: e.overPackage } }
       throw e
     }

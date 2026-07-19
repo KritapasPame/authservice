@@ -97,6 +97,10 @@ export async function setPermissions(user: { id: number; tenantId: number }, i: 
   const rows = i.permissionKeys.length ? await db.select().from(permissions).where(inArray(permissions.key, i.permissionKeys)) : []
   const missing = i.permissionKeys.filter(k => !rows.some(r => r.key === k))
   if (missing.length) throw { missing }
+  // management keys (tenant.*) เป็น platform plane เสมอ — ห้ามเข้ามาทาง user_permissions แม้ tenant ไม่มีแพ็ค (allowedKeys = null = unrestricted)
+  // ให้ผ่านได้ทางเดียวคือ isGroupAdmin ผ่าน PATCH /:id/admin — เช็คก่อน allowedKeys กันหลุดตอน tenant ไม่มีแพ็ค
+  const forbidden = i.permissionKeys.filter(k => k.startsWith('tenant.'))
+  if (forbidden.length) throw { forbiddenKeys: forbidden }
   const allowed = await allowedKeys(user.tenantId)
   const over = allowed ? i.permissionKeys.filter(k => !allowed.has(k)) : []
   if (over.length) throw { overPackage: over }
