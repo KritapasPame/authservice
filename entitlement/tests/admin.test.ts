@@ -2,7 +2,7 @@ import { test, expect, mock } from 'bun:test'
 import { Elysia } from 'elysia'
 import { bearer } from './helpers/auth-mock'
 import { db } from '../src/db/client'
-import { tenants, companies, users, modules, tenantModules } from '../src/db/schema'
+import { tenants, companies, users } from '../src/db/schema'
 import { env } from '../src/config/env'
 
 // mock zitadel client — /admin/logins ต้อง passthrough ผ่าน listLoginEvents() เท่านั้น ไม่ยิง network จริง
@@ -37,7 +37,7 @@ const get = (path: string, headers: Record<string, string>) =>
 const superAuth = bearer({ sub: 'z1', 'urn:platform:role': 'superadmin' })
 const tenantAdminAuth = bearer({ sub: 'z2', 'urn:platform:role': 'tenant_admin' })
 
-test('GET /admin/overview returns correct counts + enabled modules for seeded tenants', async () => {
+test('GET /admin/overview returns correct users/companies counts for seeded tenants (no package)', async () => {
   const suffix = 'admin-ov-' + Date.now()
   const t1 = await makeTenant('t1-' + suffix)
   const t2 = await makeTenant('t2-' + suffix)
@@ -51,33 +51,29 @@ test('GET /admin/overview returns correct counts + enabled modules for seeded te
   await makeUser(t1, 'zu3-' + suffix)
   await makeUser(t2, 'zu4-' + suffix)
 
-  const [mod] = await db.insert(modules).values({ key: 'mod-' + suffix, name: 'Mod ' + suffix }).returning()
-  await db.insert(tenantModules).values({ tenantId: t1, moduleId: mod.id, enabled: true })
-
   const res = await get('/admin/overview', { authorization: superAuth })
   expect(res.status).toBe(200)
-  const body = await res.json() as { tenantId: number; name: string; userCount: number; companyCount: number; enabledModules: string[] }[]
+  const body = await res.json() as { tenants: { id: number; name: string; slug: string; type: string; status: string; package: string | null; seatLimit: number | null; users: number; companies: number }[] }
 
-  const row1 = body.find(r => r.tenantId === t1)!
-  const row2 = body.find(r => r.tenantId === t2)!
-  expect(row1.userCount).toBe(3)
-  expect(row1.companyCount).toBe(2)
-  expect(row1.enabledModules).toContain('mod-' + suffix)
-  expect(row2.userCount).toBe(1)
-  expect(row2.companyCount).toBe(1)
-  expect(row2.enabledModules).not.toContain('mod-' + suffix)
+  const row1 = body.tenants.find(r => r.id === t1)!
+  const row2 = body.tenants.find(r => r.id === t2)!
+  expect(row1.users).toBe(3)
+  expect(row1.companies).toBe(2)
+  expect(row1.package).toBeNull()
+  expect(row2.users).toBe(1)
+  expect(row2.companies).toBe(1)
 })
 
-test('GET /admin/overview row key-set is exactly the five allowed keys — no business data leaks (PDPA boundary)', async () => {
+test('GET /admin/overview row key-set is exactly the nine allowed keys — no business data leaks (PDPA boundary)', async () => {
   const suffix = 'admin-keys-' + Date.now()
   await makeTenant('t-' + suffix)
 
   const res = await get('/admin/overview', { authorization: superAuth })
   expect(res.status).toBe(200)
-  const body = await res.json() as Record<string, unknown>[]
-  expect(body.length).toBeGreaterThan(0)
-  for (const row of body) {
-    expect(Object.keys(row).sort()).toEqual(['companyCount', 'enabledModules', 'name', 'tenantId', 'userCount'])
+  const body = await res.json() as { tenants: Record<string, unknown>[] }
+  expect(body.tenants.length).toBeGreaterThan(0)
+  for (const row of body.tenants) {
+    expect(Object.keys(row).sort()).toEqual(['companies', 'id', 'name', 'package', 'seatLimit', 'slug', 'status', 'type', 'users'])
   }
 })
 
