@@ -46,7 +46,7 @@ async function request(method, path, body) {
   // path must be root-relative — never let a page accidentally send the bearer token to a
   // different origin (e.g. a pasted absolute URL like "https://evil.com/x", or a bare relative
   // path like "users/1" that `fetch` would resolve against the current page instead of apiBase).
-  if (typeof path !== 'string' || !path.startsWith('/')) {
+  if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) {  // '//' = protocol-relative → ข้าม origin ได้
     throw new Error(`api path must start with "/": ${path}`)
   }
 
