@@ -1,7 +1,8 @@
 import { db } from '../../db/client'
-import { users, userCompanies, userRoles, roles, tenants, companies } from '../../db/schema'
+import { users, userCompanies, userRoles, roles, tenants, companies, userPermissions, permissions } from '../../db/schema'
 import { createZitadelUser } from '../../zitadel/client'
 import { canManageTenant } from '../../http/auth'
+import { allowedKeys } from '../package/allowed'
 import { eq, inArray, isNull, or, and } from 'drizzle-orm'
 import type { InviteUserInput } from '@platform/contracts'
 
@@ -78,4 +79,44 @@ export async function removeCompany(userId: number, companyId: number) {
   await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.companyId, companyId)))
   await db.delete(userCompanies).where(and(eq(userCompanies.userId, userId), eq(userCompanies.companyId, companyId)))
   return { ok: true }
+}
+
+export async function getPermissions(userId: number, companyId: number) {
+  const [m] = await db.select().from(userCompanies).where(and(eq(userCompanies.userId, userId), eq(userCompanies.companyId, companyId)))
+  if (!m) throw { invalidCompany: companyId }
+  const rows = await db.select({ key: permissions.key }).from(userPermissions)
+    .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+    .where(and(eq(userPermissions.userId, userId), eq(userPermissions.companyId, companyId)))
+  return { companyId, position: m.position, permissionKeys: rows.map(r => r.key) }
+}
+
+// replace ทั้งชุด (copy-on-save จาก preset เกิดฝั่ง UI — server เห็นแค่ list สุดท้าย)
+export async function setPermissions(user: { id: number; tenantId: number }, i: { companyId: number; position?: string; permissionKeys: string[] }) {
+  const [m] = await db.select().from(userCompanies).where(and(eq(userCompanies.userId, user.id), eq(userCompanies.companyId, i.companyId)))
+  if (!m) throw { invalidCompany: i.companyId }
+  const rows = i.permissionKeys.length ? await db.select().from(permissions).where(inArray(permissions.key, i.permissionKeys)) : []
+  const missing = i.permissionKeys.filter(k => !rows.some(r => r.key === k))
+  if (missing.length) throw { missing }
+  const allowed = await allowedKeys(user.tenantId)
+  const over = allowed ? i.permissionKeys.filter(k => !allowed.has(k)) : []
+  if (over.length) throw { overPackage: over }
+  await db.delete(userPermissions).where(and(eq(userPermissions.userId, user.id), eq(userPermissions.companyId, i.companyId)))
+  if (rows.length) await db.insert(userPermissions).values(rows.map(r => ({ userId: user.id, companyId: i.companyId, permissionId: r.id })))
+  await db.update(userCompanies).set({ position: i.position ?? null }).where(and(eq(userCompanies.userId, user.id), eq(userCompanies.companyId, i.companyId)))
+  return { ok: true }
+}
+
+export async function setAdmin(user: { id: number; tenantId: number }, i: { groupAdmin?: boolean; companyId?: number; admin?: boolean }) {
+  if (i.groupAdmin !== undefined) { await db.update(users).set({ isGroupAdmin: i.groupAdmin }).where(eq(users.id, user.id)); return { ok: true } }
+  const [m] = await db.select().from(userCompanies).where(and(eq(userCompanies.userId, user.id), eq(userCompanies.companyId, i.companyId!)))
+  if (!m) throw { invalidCompany: i.companyId }
+  await db.update(userCompanies).set({ isAdmin: i.admin! }).where(and(eq(userCompanies.userId, user.id), eq(userCompanies.companyId, i.companyId!)))
+  return { ok: true }
+}
+
+export async function listTenantUsers(tenantId: number) {
+  const us = await db.select().from(users).where(eq(users.tenantId, tenantId))
+  const ms = us.length ? await db.select().from(userCompanies).where(inArray(userCompanies.userId, us.map(u => u.id))) : []
+  return us.map(u => ({ id: u.id, email: u.email, status: u.status, isGroupAdmin: u.isGroupAdmin,
+    memberships: ms.filter(m => m.userId === u.id).map(m => ({ companyId: m.companyId, position: m.position, isAdmin: m.isAdmin })) }))
 }

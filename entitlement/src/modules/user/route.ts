@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia'
-import { requireAuth, canManageTenant } from '../../http/auth'
-import { inviteUser, getUser, setStatus, addCompany, removeCompany, assignRole, revokeRole } from './service'
+import { requireAuth, canManageTenant, isGroupAdmin } from '../../http/auth'
+import { inviteUser, getUser, setStatus, addCompany, removeCompany, assignRole, revokeRole, getPermissions, setPermissions, setAdmin, listTenantUsers } from './service'
 
 export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
   .post('/invite', async ({ auth, body, set }) => {
@@ -61,3 +61,34 @@ export const userRouter = new Elysia({ prefix: '/users' }).use(requireAuth)
     if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
     return removeCompany(user.id, Number(params.companyId))
   })
+  .get('/tenant/:tenantId', ({ auth, params, set }) => {
+    const tenantId = Number(params.tenantId)
+    if (!canManageTenant(auth.claims, tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    return listTenantUsers(tenantId)
+  })
+  .get('/:id/permissions', async ({ auth, params, query, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    try { return await getPermissions(user.id, Number(query.companyId)) }
+    catch (e: any) { if (e?.invalidCompany !== undefined) { set.status = 400; return { invalidCompany: e.invalidCompany } } throw e }
+  })
+  .put('/:id/permissions', async ({ auth, params, body, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!canManageTenant(auth.claims, user.tenantId, 'tenant.user.manage')) { set.status = 403; return 'forbidden' }
+    try { return await setPermissions(user, body) }
+    catch (e: any) {
+      if (e?.invalidCompany !== undefined) { set.status = 400; return { invalidCompany: e.invalidCompany } }
+      if (e?.missing) { set.status = 404; return { missing: e.missing } }
+      if (e?.overPackage) { set.status = 400; return { overPackage: e.overPackage } }
+      throw e
+    }
+  }, { body: t.Object({ companyId: t.Number(), position: t.Optional(t.String()), permissionKeys: t.Array(t.String()) }) })
+  .patch('/:id/admin', async ({ auth, params, body, set }) => {
+    const user = await getUser(Number(params.id))
+    if (!user) { set.status = 404; return 'user not found' }
+    if (!isGroupAdmin(auth.claims, user.tenantId)) { set.status = 403; return 'forbidden' }   // เข้มกว่า user.manage — ตั้ง admin ได้เฉพาะ group admin ขึ้นไป
+    try { return await setAdmin(user, body) }
+    catch (e: any) { if (e?.invalidCompany !== undefined) { set.status = 400; return { invalidCompany: e.invalidCompany } } throw e }
+  }, { body: t.Union([t.Object({ groupAdmin: t.Boolean() }), t.Object({ companyId: t.Number(), admin: t.Boolean() })]) })
