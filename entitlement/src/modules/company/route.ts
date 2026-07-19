@@ -8,6 +8,7 @@ export const companyRouter = new Elysia({ prefix: '/companies' }).use(requireAut
     try {
       return await createCompany(body)
     } catch (e: any) {
+      if (e?.quota) { set.status = 403; return { quota: e.quota, limit: e.limit } }
       if (e?.invalidParent !== undefined) { set.status = 400; return { invalidParent: e.invalidParent } }
       throw e
     }
