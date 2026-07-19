@@ -3,8 +3,7 @@ import { Elysia } from 'elysia'
 import { eq } from 'drizzle-orm'
 import { bearer } from './helpers/auth-mock'
 import { db } from '../src/db/client'
-import { tenants, companies, roles, users, userCompanies, userRoles } from '../src/db/schema'
-const { seedSystemRoles } = await import('../src/modules/role/seed')
+import { tenants, companies, users, userCompanies, userPermissions, permissions, modules, tenantModules, packages, packagePermissions } from '../src/db/schema'
 
 // mock zitadel client — ไม่ยิง network จริง (mock.module เป็น process-global — ต้อง mock ทุก export ของโมดูล
 // (createZitadelOrg, createZitadelUser, listLoginEvents) ไม่งั้น tenant.test.ts / admin.test.ts ที่ import
@@ -18,10 +17,17 @@ mock.module('../src/zitadel/client', () => ({
 }))
 
 const { userRouter } = await import('../src/modules/user/route')
+const { setTenantPackage } = await import('../src/modules/package/service')
 
 async function makeTenant(slug: string) {
   const [row] = await db.insert(tenants).values({ name: 'T-' + slug, slug, zitadelOrgId: 'org_' + slug }).returning()
   return row.id
+}
+
+async function enableModule(tenantId: number, key: string, enabled = true) {
+  const [mod] = await db.select().from(modules).where(eq(modules.key, key))
+  await db.insert(tenantModules).values({ tenantId, moduleId: mod.id, enabled })
+    .onConflictDoUpdate({ target: [tenantModules.tenantId, tenantModules.moduleId], set: { enabled } })
 }
 
 const post = (headers: Record<string, string>, body: unknown) =>
@@ -31,13 +37,12 @@ const post = (headers: Record<string, string>, body: unknown) =>
     body: JSON.stringify(body),
   }))
 
-test('superadmin invites user → user row + user_companies + user_roles created', async () => {
+test('superadmin invites user → user row + user_companies + user_permissions created', async () => {
   const tenantId = await makeTenant('invite-sa-' + Date.now())
   const [company] = await db.insert(companies).values({ tenantId, name: 'Co A' }).returning()
-  const [role] = await db.insert(roles).values({ tenantId, name: 'Custom Role', slug: 'invite-role-' + Date.now() }).returning()
 
   const auth = bearer({ sub: 'z1', 'urn:platform:role': 'superadmin' })
-  const res = await post({ authorization: auth }, { tenantId, email: 'new-user@example.com', companyIds: [company.id], roleSlugs: [role.slug] })
+  const res = await post({ authorization: auth }, { tenantId, email: 'new-user@example.com', companyIds: [company.id], permissionKeys: ['esign.document.read'] })
   expect(res.status).toBe(200)
   const body = await res.json() as { id: number; email: string; zitadelUserId: string }
   expect(body.email).toBe('new-user@example.com')
@@ -49,28 +54,11 @@ test('superadmin invites user → user row + user_companies + user_roles created
   const ucRows = await db.select().from(userCompanies).where(eq(userCompanies.userId, body.id))
   expect(ucRows.map(r => r.companyId)).toEqual([company.id])
 
-  const urRows = await db.select().from(userRoles).where(eq(userRoles.userId, body.id))
-  expect(urRows.length).toBe(1)
-  expect(urRows[0].roleId).toBe(role.id)
-  expect(urRows[0].companyId).toBeNull()
-})
-
-test('roleSlugs matching another tenant role slug do NOT attach', async () => {
-  const tenantId = await makeTenant('invite-own-' + Date.now())
-  const otherTenantId = await makeTenant('invite-other-' + Date.now())
-  const sharedSlug = 'shared-slug-' + Date.now()
-  const [decoyRole] = await db.insert(roles).values({ tenantId: otherTenantId, name: 'Decoy', slug: sharedSlug }).returning()
-
-  const auth = bearer({ sub: 'z1', 'urn:platform:role': 'superadmin' })
-  const res = await post({ authorization: auth }, { tenantId, email: 'decoy-test@example.com', companyIds: [], roleSlugs: [sharedSlug] })
-  expect(res.status).toBe(200)
-  const body = await res.json() as { id: number }
-
-  const urRows = await db.select().from(userRoles).where(eq(userRoles.userId, body.id))
-  expect(urRows.length).toBe(0)
-  // sanity: decoy role really exists in the other tenant, just not attached to this user
-  const [decoyCheck] = await db.select().from(roles).where(eq(roles.id, decoyRole.id))
-  expect(decoyCheck.tenantId).toBe(otherTenantId)
+  const upRows = await db.select({ key: permissions.key }).from(userPermissions)
+    .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+    .where(eq(userPermissions.userId, body.id))
+  expect(upRows.length).toBe(1)
+  expect(upRows[0].key).toBe('esign.document.read')
 })
 
 test('tenant user with tenant.user.manage grant invites into own tenant → 200', async () => {
@@ -79,7 +67,7 @@ test('tenant user with tenant.user.manage grant invites into own tenant → 200'
     sub: 'z2', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': tenantId,
     'urn:platform:grants': { '1': { roles: ['group_admin'], permissions: ['tenant.user.manage'] } },
   })
-  const res = await post({ authorization: auth }, { tenantId, email: 'grant-invite@example.com', companyIds: [], roleSlugs: [] })
+  const res = await post({ authorization: auth }, { tenantId, email: 'grant-invite@example.com', companyIds: [] })
   expect(res.status).toBe(200)
 })
 
@@ -90,12 +78,12 @@ test('tenant user invites into a different tenant → 403', async () => {
     sub: 'z3', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': otherTenantId,
     'urn:platform:grants': { '1': { roles: ['group_admin'], permissions: ['tenant.user.manage'] } },
   })
-  const res = await post({ authorization: auth }, { tenantId, email: 'should-not-invite@example.com', companyIds: [], roleSlugs: [] })
+  const res = await post({ authorization: auth }, { tenantId, email: 'should-not-invite@example.com', companyIds: [] })
   expect(res.status).toBe(403)
 })
 
 test('POST /users/invite with no token → 401', async () => {
-  const res = await post({}, { tenantId: 1, email: 'nope@example.com', companyIds: [], roleSlugs: [] })
+  const res = await post({}, { tenantId: 1, email: 'nope@example.com', companyIds: [] })
   expect(res.status).toBe(401)
 })
 
@@ -109,7 +97,7 @@ test('tenant admin invites with a companyId belonging to another tenant → 400,
     'urn:platform:grants': { '1': { roles: ['group_admin'], permissions: ['tenant.user.manage'] } },
   })
   const email = 'cross-tenant-victim@example.com'
-  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [otherCompany.id], roleSlugs: [] })
+  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [otherCompany.id] })
   expect(res.status).toBe(400)
   const body = await res.json() as { invalidCompanies: number[] }
   expect(body.invalidCompanies).toEqual([otherCompany.id])
@@ -118,39 +106,28 @@ test('tenant admin invites with a companyId belonging to another tenant → 400,
   expect(rows.length).toBe(0)
 })
 
-test('S1: caller with only tenant.user.manage (no *) inviting a grantAll role → 403, no user row created', async () => {
-  await seedSystemRoles()
-  const tenantId = await makeTenant('invite-escalate-' + Date.now())
+// เดิมเป็นเคส "escalation" (ยัด role grantAll ผ่าน roleSlugs) — V2 ไม่มี role ในเส้น invite แล้ว
+// เพดานสิทธิ์ตอนนี้คือแพ็คของ tenant (allowedKeys) แทน: key เกินแพ็ค → 400 overPackage, ไม่สร้าง user row
+test('S1: permissionKeys เกินแพ็คของ tenant → 400 overPackage, ไม่สร้าง user row', async () => {
+  const tenantId = await makeTenant('invite-overpkg-' + Date.now())
+  await enableModule(tenantId, 'esign')
+  const signPerm = (await db.select().from(permissions).where(eq(permissions.key, 'esign.document.sign')))[0]
+  const [pkg] = await db.insert(packages).values({ name: 'P', slug: 'invite-overpkg-' + Date.now(), seatLimit: 10, companyLimit: 10, adminLimit: 10 }).returning()
+  await db.insert(packagePermissions).values({ packageId: pkg.id, permissionId: signPerm.id })
+  await setTenantPackage(tenantId, pkg.slug)
+
   const auth = bearer({
     sub: 'z6', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': tenantId,
     'urn:platform:grants': { '1': { roles: [], permissions: ['tenant.user.manage'] } },
   })
-  const email = 'escalate-victim@example.com'
-  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [], roleSlugs: ['group_admin'] })
-  expect(res.status).toBe(403)
-  const body = await res.json() as { forbiddenRole: string[] }
-  expect(body.forbiddenRole).toEqual(['group_admin'])
+  const email = 'overpkg-victim@example.com'
+  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [], permissionKeys: ['esign.document.send'] })
+  expect(res.status).toBe(400)
+  const body = await res.json() as { overPackage: string[] }
+  expect(body.overPackage).toEqual(['esign.document.send'])
 
   const rows = await db.select().from(users).where(eq(users.email, email))
   expect(rows.length).toBe(0)
-})
-
-test('S1: caller with a * grant CAN invite a grantAll role → 200, role attached', async () => {
-  await seedSystemRoles()
-  const tenantId = await makeTenant('invite-star-' + Date.now())
-  const auth = bearer({
-    sub: 'z7', 'urn:platform:role': 'tenant_admin', 'urn:platform:tenantId': tenantId,
-    'urn:platform:grants': { '1': { roles: ['group_admin'], permissions: ['*'] } },
-  })
-  const email = 'star-invite@example.com'
-  const res = await post({ authorization: auth }, { tenantId, email, companyIds: [], roleSlugs: ['group_admin'] })
-  expect(res.status).toBe(200)
-  const body = await res.json() as { id: number }
-
-  const [groupAdmin] = await db.select().from(roles).where(eq(roles.slug, 'group_admin'))
-  const urRows = await db.select().from(userRoles).where(eq(userRoles.userId, body.id))
-  expect(urRows.length).toBe(1)
-  expect(urRows[0].roleId).toBe(groupAdmin!.id)
 })
 
 test('duplicate companyIds in payload → single user_companies row', async () => {
@@ -158,7 +135,7 @@ test('duplicate companyIds in payload → single user_companies row', async () =
   const [company] = await db.insert(companies).values({ tenantId, name: 'Dedupe Co' }).returning()
 
   const auth = bearer({ sub: 'z5', 'urn:platform:role': 'superadmin' })
-  const res = await post({ authorization: auth }, { tenantId, email: 'dedupe-invite@example.com', companyIds: [company.id, company.id], roleSlugs: [] })
+  const res = await post({ authorization: auth }, { tenantId, email: 'dedupe-invite@example.com', companyIds: [company.id, company.id] })
   expect(res.status).toBe(200)
   const body = await res.json() as { id: number }
 
