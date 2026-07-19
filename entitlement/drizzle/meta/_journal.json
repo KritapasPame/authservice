@@ -22,6 +22,13 @@
       "when": 1784462394738,
       "tag": "0002_handy_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784465528075,
+      "tag": "0003_organic_dracula",
+      "breakpoints": true
     }
   ]
 }
