@@ -5,7 +5,8 @@ import { isSuperadmin } from './auth.js'
 
 const routes = []
 
-function compile(pattern) {
+/** Compile a '#/foo/:id' pattern into a matching RegExp + ordered param names. Exported for tests. */
+export function compile(pattern) {
   const path = pattern.replace(/^#/, '')
   const paramNames = []
   const source =

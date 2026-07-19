@@ -97,14 +97,14 @@ async function selectUser(userId) {
   state.selectedUserId = userId
   const u = currentUser()
   state.selectedCompanyId = u?.memberships[0]?.companyId ?? null
-  state.selectedPresetSlug = ''
+  // selectedPresetSlug is set by loadPermissions() below (matched preset, or '' if none/no selection)
   await loadPermissions()
   renderAll()
 }
 
 async function selectCompany(companyId) {
   state.selectedCompanyId = companyId
-  state.selectedPresetSlug = ''
+  // selectedPresetSlug is set by loadPermissions() below (matched preset, or '' if none/no selection)
   await loadPermissions()
   renderAll()
 }
