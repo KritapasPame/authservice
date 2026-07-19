@@ -1,7 +1,7 @@
 // admin-ui/src/pages/tenant.js — หน้า 3: รายละเอียดลูกค้า (superadmin)
 // GET /admin/tenants/:id ({ tenant, package, usage:{seats,companies,admins}, companies:[{id,name,status,users,admins}] })
 import { route } from '../router.js'
-import { api, toast } from '../api.js'
+import { api, toast, esc } from '../api.js'
 import { getToken } from '../auth.js'
 
 // module override switches (PUT /modules/tenants/:tid/:key) — no GET exists to read current
@@ -10,9 +10,6 @@ const MODULES = [
   { key: 'hr', label: 'HR' },
   { key: 'esign', label: 'eSign' },
 ]
-
-const esc = (s) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
 function quotaBadge(used, limit) {
   if (!limit) return ''
@@ -95,6 +92,7 @@ async function printInvoice(number, type, btn) {
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   } catch {
     toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้')
   } finally {

@@ -1,12 +1,12 @@
 // admin-ui/src/pages/customers.js — หน้า 1: ลูกค้าทั้งหมด (superadmin)
 import { route, navigate } from '../router.js'
-import { api, toast } from '../api.js'
+import { api, toast, esc } from '../api.js'
 
 const state = { tenants: [], filter: 'all' }
 
 function statusBadge(status) {
   const cls = status === 'active' ? 'b-ok' : status === 'trial' ? 'b-warn' : 'b-crit'
-  return `<span class="badge ${cls}">${status}</span>`
+  return `<span class="badge ${cls}">${esc(status)}</span>`
 }
 
 function quotaCell(t) {
@@ -53,8 +53,8 @@ function rowsHtml() {
     .map(
       (t) => `
     <tr>
-      <td><strong>${t.name}</strong><br><span style="font-size:12.5px;color:var(--muted)">${t.slug}</span></td>
-      <td>${t.package ? `<span class="chip">${t.package}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+      <td><strong>${esc(t.name)}</strong><br><span style="font-size:12.5px;color:var(--muted)">${esc(t.slug)}</span></td>
+      <td>${t.package ? `<span class="chip">${esc(t.package)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
       ${quotaCell(t)}
       <td class="num">${t.type === 'personal' ? '<span style="color:var(--muted)">—</span>' : (t.companies ?? 0)}</td>
       <td>${statusBadge(t.status)}</td>

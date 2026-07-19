@@ -1,6 +1,6 @@
 // admin-ui/src/pages/packages.js — หน้า 2: แพ็กเกจ (superadmin)
 import { route } from '../router.js'
-import { api, toast } from '../api.js'
+import { api, toast, esc } from '../api.js'
 import { MODULES, PERMISSIONS } from '../constants.js'
 
 const state = { packages: [] }
@@ -71,7 +71,7 @@ function tableHtml() {
         <thead>
           <tr>
             <th style="min-width:200px"></th>
-            ${state.packages.map((p) => `<th style="text-align:center">${p.name}</th>`).join('')}
+            ${state.packages.map((p) => `<th style="text-align:center">${esc(p.name)}</th>`).join('')}
           </tr>
         </thead>
         <tbody>

@@ -4,7 +4,7 @@
 // change (innerHTML + re-attach listeners). Simplest correct approach for this data size —
 // no vdom, no partial-diffing framework.
 import { route } from '../router.js'
-import { api, toast } from '../api.js'
+import { api, toast, esc } from '../api.js'
 import { claims, isSuperadmin } from '../auth.js'
 import { PERMISSIONS, MODULES } from '../constants.js'
 
@@ -72,15 +72,25 @@ async function loadPermissions() {
   if (!state.selectedUserId || !state.selectedCompanyId) {
     state.perm = null
     state.checked = new Set()
+    state.selectedPresetSlug = ''
     return
   }
   try {
     state.perm = await api.get(`/users/${state.selectedUserId}/permissions?companyId=${state.selectedCompanyId}`)
     state.checked = new Set(state.perm.permissionKeys)
+    state.selectedPresetSlug = matchingPresetSlug(state.perm.permissionKeys)
   } catch {
     state.perm = null
     state.checked = new Set()
+    state.selectedPresetSlug = ''
   }
+}
+
+/** Preset slug whose permissionKeys set exactly equals `keys`, or '' (— กำหนดเอง —) if none match. */
+function matchingPresetSlug(keys) {
+  const sortedKeys = [...keys].sort().join(',')
+  const match = state.presets.find((p) => [...p.permissionKeys].sort().join(',') === sortedKeys)
+  return match?.slug ?? ''
 }
 
 async function selectUser(userId) {
@@ -209,6 +219,7 @@ async function onToggleStatus() {
 
 function openDialog(innerHtml, wire) {
   const dlg = document.createElement('dialog')
+  dlg.style.cssText = 'background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px'
   dlg.innerHTML = innerHtml
   document.body.appendChild(dlg)
   dlg.addEventListener('close', () => dlg.remove())
@@ -327,10 +338,6 @@ function openSavePresetDialog() {
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
-
-function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-}
 
 function frameBarHtml() {
   const c = claims() || {}

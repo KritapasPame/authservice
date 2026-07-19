@@ -7,6 +7,11 @@ function baseUrl() {
   return (window.EDM_CONFIG && window.EDM_CONFIG.apiBase) || ''
 }
 
+/** Escape a value for safe interpolation into innerHTML. Shared by every page that renders API data. */
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+}
+
 /** Append a toast to #toasts; auto-removed after 4s. kind: 'error' (default) | 'ok'. */
 export function toast(message, kind = 'error') {
   const container = document.getElementById('toasts')
