@@ -4,6 +4,9 @@ import { companyRouter } from '../modules/company/route'
 import { roleRouter } from '../modules/role/route'
 import { moduleRouter } from '../modules/module/route'
 import { userRouter } from '../modules/user/route'
+import { presetRouter } from '../modules/preset/route'
+import { packageRouter } from '../modules/package/route'
+import { invoiceRouter } from '../modules/invoice/route'
 import { claimsRouter } from '../claims/route'
 import { zitadelClaimsRouter } from '../claims/zitadel-route'
 import { adminRouter } from '../modules/admin/route'
@@ -27,6 +30,9 @@ export function createApp() {
     .use(roleRouter)
     .use(moduleRouter)
     .use(userRouter)
+    .use(presetRouter)
+    .use(packageRouter)
+    .use(invoiceRouter)
     .use(claimsRouter)
     .use(zitadelClaimsRouter)
     .use(adminRouter)
