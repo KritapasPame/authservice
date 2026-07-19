@@ -7,7 +7,8 @@ export const listInvoices = (tenantId: number) => db.select().from(invoices).whe
 export async function createInvoice(tenantId: number, i: { description: string; amount: number }) {
   const [t] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
   if (!t) throw { notFound: 'tenant' }
-  const [row] = await db.insert(invoices).values({ tenantId, number: 'PENDING', ...i }).returning()
+  // placeholder ต้อง unique เอง — UNIQUE(number) ถ้าใช้ 'PENDING' ตรงๆ แล้ว insert สองอันพร้อมกัน (หรือ crash ก่อน update ด้านล่าง) จะชนกันวืด
+  const [row] = await db.insert(invoices).values({ tenantId, number: 'PENDING-' + crypto.randomUUID(), ...i }).returning()
   const number = `INV-${new Date().getFullYear()}-${String(row.id).padStart(4, '0')}`   // เลขรันจาก id — ชนกันไม่ได้
   await db.update(invoices).set({ number }).where(eq(invoices.id, row.id))
   return { ...row, number }

@@ -21,9 +21,11 @@ export async function inviteUser(i: InviteUserInput) {
     }
   }
   // สิทธิ์เริ่มต้น: permissionKeys ตรงชนะ preset — preset เป็นแค่ template (copy-on-save)
-  const preset = i.presetSlug
-    ? (await db.select().from(presets).where(and(eq(presets.slug, i.presetSlug), or(isNull(presets.tenantId), eq(presets.tenantId, i.tenantId)))))[0]
-    : undefined
+  // slug ชนกัน system กับ tenant ตัวเอง (เช่น seed มา slug เดียวกัน) → tenant preset ชนะเสมอ ไม่พึ่ง order จาก DB
+  const presetMatches = i.presetSlug
+    ? await db.select().from(presets).where(and(eq(presets.slug, i.presetSlug), or(isNull(presets.tenantId), eq(presets.tenantId, i.tenantId))))
+    : []
+  const preset = presetMatches.find(p => p.tenantId !== null) ?? presetMatches[0]
   if (i.presetSlug && !preset) throw { notFound: 'preset' }
   const keys = i.permissionKeys ?? (preset
     ? (await db.select({ key: permissions.key }).from(presetPermissions).innerJoin(permissions, eq(presetPermissions.permissionId, permissions.id)).where(eq(presetPermissions.presetId, preset.id))).map(r => r.key)

@@ -167,6 +167,27 @@ test('preset slug ชนกับ tenant อื่น (decoy) → ไม่ atta
   expect(rows.length).toBe(0)
 })
 
+// slug ชนกัน system preset กับ tenant preset ตัวเอง → tenant ต้องชนะเสมอ ไม่พึ่ง order จาก DB (ดู service.ts)
+test('preset slug ชนกัน system กับ tenant preset ตัวเอง → invite ได้สิทธิ์จาก tenant preset', async () => {
+  const tenant = await makeTenant()
+  const co = await makeCompany(tenant.id)
+  const sharedSlug = `shadow-preset-${Date.now()}`
+  await makePresetWithSlug(null, sharedSlug, ['esign.document.read'])          // system preset
+  const tenantPreset = await makePresetWithSlug(tenant.id, sharedSlug, ['esign.document.sign'])   // tenant preset slug เดียวกัน
+
+  const res = await invite({ tenantId: tenant.id, email: `shadow-${Date.now()}@example.com`, companyIds: [co.id], presetSlug: sharedSlug })
+  expect(res.status).toBe(200)
+  const body = await res.json() as { id: number }
+
+  const upRows = await db.select({ key: permissions.key }).from(userPermissions)
+    .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+    .where(eq(userPermissions.userId, body.id))
+  expect(upRows.map(r => r.key)).toEqual(['esign.document.sign'])   // ของ tenant preset ไม่ใช่ system
+
+  const [uc] = await db.select().from(userCompanies).where(eq(userCompanies.userId, body.id))
+  expect(uc.position).toBe(tenantPreset.name)
+})
+
 // SECURITY: permissionKeys ตรงหรือมาจาก preset ห้ามมี management key (tenant.*) หลุดเข้า user_permissions
 // ทางเดียวที่ได้สิทธิ์ tenant.* คือ isGroupAdmin ผ่าน PATCH /:id/admin — เหมือน invariant ของ setPermissions
 test('invite permissionKeys มี tenant.* (management key) → 403 { forbiddenKeys }, ไม่สร้าง user', async () => {
