@@ -6,7 +6,7 @@ import { tenants, companies, users, userCompanies, userPermissions, permissions,
 import { env } from '../src/config/env'
 import type { PlatformClaims, Grant } from '@platform/contracts'
 
-const { seedSystemRoles } = await import('../src/modules/role/seed')
+const { seedBase } = await import('../src/db/seed')
 const { resolveClaims } = await import('../src/claims/resolver')
 const { claimsRouter } = await import('../src/claims/route')
 
@@ -59,7 +59,7 @@ const post = (headers: Record<string, string>, body: unknown) =>
   }))
 
 test('V2: company admin scoped to company A gets all allowed keys, userPermissions scoped to company B stays limited', async () => {
-  await seedSystemRoles()
+  await seedBase()
   const tenantId = await makeTenant('somchai-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const companyB = await makeCompany(tenantId, 'Company B')
@@ -101,7 +101,7 @@ test('V2: company admin scoped to company A gets all allowed keys, userPermissio
 })
 
 test('module filter: disabling hr for the tenant removes hr keys from every grant, management keys ยังอยู่ (bypass filter)', async () => {
-  await seedSystemRoles()
+  await seedBase()
   const tenantId = await makeTenant('modfilter-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const companyB = await makeCompany(tenantId, 'Company B')
@@ -137,7 +137,7 @@ test('module filter: disabling hr for the tenant removes hr keys from every gran
 })
 
 test('userPermissions granted per-company ใช้ได้อิสระต่อกันในแต่ละบริษัทที่ user เป็นสมาชิก', async () => {
-  await seedSystemRoles()
+  await seedBase()
   const tenantId = await makeTenant('tenantwide-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const companyB = await makeCompany(tenantId, 'Company B')

@@ -6,7 +6,7 @@ import { db } from '../src/db/client'
 import { tenants, companies, users, userCompanies, platformAdmins } from '../src/db/schema'
 import { env } from '../src/config/env'
 
-const { seedSystemRoles } = await import('../src/modules/role/seed')
+const { seedBase } = await import('../src/db/seed')
 const { zitadelClaimsRouter } = await import('../src/claims/zitadel-route')
 
 const TEST_KEY = 'unit-test-zitadel-signing-key'
@@ -57,7 +57,7 @@ async function post(raw: string, signatureHeader?: string) {
 }
 
 test('correctly signed request for a provisioned tenant user → 200 + append_claims with exact keys and round-tripped grants', async () => {
-  await seedSystemRoles()
+  await seedBase()
   const tenantId = await makeTenant('zw-tenant-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const userId = await makeUser(tenantId, 'zw-user-' + Date.now())

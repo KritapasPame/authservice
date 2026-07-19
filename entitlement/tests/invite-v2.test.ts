@@ -49,7 +49,9 @@ async function makePackage(over: Partial<{ seatLimit: number; companyLimit: numb
   return p
 }
 async function makePreset(tenantId: number | null, keys: string[]) {
-  const slug = `invv2-preset-${Date.now()}-${++seq}`
+  return makePresetWithSlug(tenantId, `invv2-preset-${Date.now()}-${++seq}`, keys)
+}
+async function makePresetWithSlug(tenantId: number | null, slug: string, keys: string[]) {
   const [p] = await db.insert(presets).values({ tenantId, name: 'Staff-' + slug, slug }).returning()
   if (keys.length) {
     const rows = await db.select().from(permissions).where(inArray(permissions.key, keys))
@@ -145,6 +147,21 @@ test('presetSlug มั่ว → 404, ไม่สร้าง user', async () 
   const tenant = await makeTenant()
   const email = `nopreset-${Date.now()}@example.com`
   const res = await invite({ tenantId: tenant.id, email, companyIds: [], presetSlug: 'no-such-preset-' + Date.now() })
+  expect(res.status).toBe(404)
+  const rows = await db.select().from(users).where(eq(users.email, email))
+  expect(rows.length).toBe(0)
+})
+
+// SECURITY: preset lookup ต้อง scope เฉพาะ system ∪ tenant ตัวเอง — decoy preset slug เดียวกันที่ tenant อื่น
+// ต้องไม่มีผลต่อ invite ของ victim tenant (ถ้า victim ไม่มี preset slug นี้เอง/system ก็ไม่มี → 404 เหมือนไม่มี preset เลย)
+test('preset slug ชนกับ tenant อื่น (decoy) → ไม่ attach ข้าม tenant, victim ไม่มี preset นี้เอง → 404, ไม่สร้าง user', async () => {
+  const victim = await makeTenant()
+  const attacker = await makeTenant()
+  const sharedSlug = `decoy-preset-${Date.now()}`
+  await makePresetWithSlug(attacker.id, sharedSlug, ['esign.document.sign'])   // preset ของ tenant อื่น slug เดียวกัน
+
+  const email = `decoy-victim-${Date.now()}@example.com`
+  const res = await invite({ tenantId: victim.id, email, companyIds: [], presetSlug: sharedSlug })
   expect(res.status).toBe(404)
   const rows = await db.select().from(users).where(eq(users.email, email))
   expect(rows.length).toBe(0)
