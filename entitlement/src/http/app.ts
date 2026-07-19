@@ -10,6 +10,7 @@ import { claimsRouter } from '../claims/route'
 import { zitadelClaimsRouter } from '../claims/zitadel-route'
 import { adminRouter } from '../modules/admin/route'
 import { signupRouter } from '../modules/signup/route'
+import { staticRouter } from './static'
 
 export function createApp() {
   return new Elysia()
@@ -17,9 +18,15 @@ export function createApp() {
     // upstream URL/status/body) — never let the raw error message reach the client. Intentional 4xx
     // paths (throw status(...), or plain objects each route already catches) never reach this handler:
     // status() responses resolve before onError runs, and thrown objects are caught locally per-route.
-    // VALIDATION is passed through untouched so Elysia's own 422 body still works.
+    // VALIDATION is passed through untouched so Elysia's own 422 body still works. NOT_FOUND
+    // (no route matched — e.g. a stray or path-traversal-normalized request under /admin) is a
+    // genuine 404, not an unexpected error; pass it through as plain 404 instead of masking it as 500.
     .onError(({ code, error, set }) => {
       if (code === 'VALIDATION') return
+      if (code === 'NOT_FOUND') {
+        set.status = 404
+        return 'not found'
+      }
       console.error(error)
       set.status = 500
       return { error: 'internal' }
@@ -36,4 +43,5 @@ export function createApp() {
     .use(zitadelClaimsRouter)
     .use(adminRouter)
     .use(signupRouter)
+    .use(staticRouter) // GET /admin, /admin/* — serves admin-ui/ (see static.ts)
 }

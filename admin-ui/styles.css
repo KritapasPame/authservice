@@ -1,0 +1,189 @@
+/* admin-ui/styles.css
+   Design tokens + component styles lifted from mockup-reference.html.
+   Mockup-only bits (.tabs, .legend, .api chips, .apilog, .apisummary, .docnote) dropped —
+   this file is what the real app (index.html + src/pages/*.js) uses. */
+
+:root {
+  --ground: #F6F8F7;
+  --surface: #FFFFFF;
+  --surface-2: #EEF2F0;
+  --ink: #1B2420;
+  --muted: #5F6E68;
+  --line: #DCE3E0;
+  --accent: #0E7A6E;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E0F0ED;
+  --ok: #177245;
+  --ok-soft: #E2F2E8;
+  --warn: #9A5B00;
+  --warn-soft: #F7EDDA;
+  --new: #24518F;
+  --new-soft: #E3EBF6;
+  --crit: #A82F2F;
+  --crit-soft: #F6E4E4;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #101614; --surface: #182019; --surface-2: #1F2A25;
+    --ink: #E6ECE9; --muted: #93A39C; --line: #2C3833;
+    --accent: #34B3A2; --accent-ink: #0C1512; --accent-soft: #1B332E;
+    --ok: #52C784; --ok-soft: #16311F; --warn: #E0A64A; --warn-soft: #33290F;
+    --new: #7CA6E0; --new-soft: #17273D; --crit: #E07B7B; --crit-soft: #3A1B1B;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #101614; --surface: #182019; --surface-2: #1F2A25;
+  --ink: #E6ECE9; --muted: #93A39C; --line: #2C3833;
+  --accent: #34B3A2; --accent-ink: #0C1512; --accent-soft: #1B332E;
+  --ok: #52C784; --ok-soft: #16311F; --warn: #E0A64A; --warn-soft: #33290F;
+  --new: #7CA6E0; --new-soft: #17273D; --crit: #E07B7B; --crit-soft: #3A1B1B;
+}
+:root[data-theme="light"] {
+  --ground: #F6F8F7; --surface: #FFFFFF; --surface-2: #EEF2F0;
+  --ink: #1B2420; --muted: #5F6E68; --line: #DCE3E0;
+  --accent: #0E7A6E; --accent-ink: #FFFFFF; --accent-soft: #E0F0ED;
+  --ok: #177245; --ok-soft: #E2F2E8; --warn: #9A5B00; --warn-soft: #F7EDDA;
+  --new: #24518F; --new-soft: #E3EBF6; --crit: #A82F2F; --crit-soft: #F6E4E4;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans Thai", "Segoe UI", "Sarabun", sans-serif;
+  font-size: 15px; line-height: 1.55;
+}
+
+.eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+h1 { font-size: 26px; margin: 4px 0 2px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0 0 18px; max-width: 62ch; }
+
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.b-ok   { background: var(--ok-soft); color: var(--ok); }
+.b-warn { background: var(--warn-soft); color: var(--warn); }
+.b-new  { background: var(--new-soft); color: var(--new); }
+.b-crit { background: var(--crit-soft); color: var(--crit); }
+
+/* app frame — reused inside <main> to frame each page's content */
+.frame {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  margin-top: 20px; overflow: hidden;
+}
+.framebar {
+  display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted);
+}
+.framebar .who { margin-left: auto; font-weight: 600; }
+.framebody { padding: 20px; }
+
+/* stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; }
+.tile .k { font-size: 12.5px; color: var(--muted); }
+.tile .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile .v small { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+/* tables */
+.tblwrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.num { font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 5px; padding: 1px 7px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+.chip.off { background: var(--surface-2); color: var(--muted); text-decoration: line-through; }
+
+/* buttons & controls */
+.btn { appearance: none; font: inherit; font-weight: 600; border-radius: 7px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+select, input[type="text"], input[type="number"], input[type="email"] {
+  font: inherit; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.toggle input { position: absolute; opacity: 0; }
+.toggle .tk { width: 34px; height: 20px; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; flex: none; }
+.toggle .tk::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); transition: left .15s; }
+.toggle input:checked + .tk { background: var(--accent); }
+.toggle input:checked + .tk::after { left: 16px; }
+.toggle input:focus-visible + .tk { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* permissions layout (หน้า 4) */
+.perm-layout { display: grid; grid-template-columns: 240px 1fr; gap: 18px; }
+@media (max-width: 760px) { .perm-layout { grid-template-columns: 1fr; } }
+.userlist { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; align-self: start; }
+.userlist button {
+  display: block; width: 100%; text-align: left; appearance: none; border: 0; background: none;
+  font: inherit; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--line); color: var(--ink);
+}
+.userlist button:last-child { border-bottom: 0; }
+.userlist button[aria-selected="true"] { background: var(--accent-soft); }
+.userlist .em { font-size: 12.5px; color: var(--muted); display: block; }
+
+.ctabs { display: flex; gap: 6px; margin: 14px 0 10px; flex-wrap: wrap; }
+.ctabs button { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+.ctabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+fieldset.pgroup { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 10px 14px 12px; }
+fieldset.pgroup legend { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 0 6px; }
+.perm { display: flex; align-items: center; gap: 9px; padding: 5px 0; }
+.perm input { width: 16px; height: 16px; accent-color: var(--accent); }
+.perm .key { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.perm label { cursor: pointer; }
+
+.adminbox { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+.adminbox .note { font-size: 12.5px; color: var(--muted); }
+
+.savebar { display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+.drift { font-size: 13px; }
+
+/* ------------------------------------------------------------------ */
+/* app shell — sidebar + main (not in mockup, needed for the real app) */
+/* ------------------------------------------------------------------ */
+.app-shell { display: flex; min-height: 100vh; align-items: stretch; }
+.sidebar {
+  width: 220px; flex: none; background: var(--surface); border-right: 1px solid var(--line);
+  padding: 18px 14px; display: flex; flex-direction: column; gap: 18px;
+}
+.sidebar .brand { font-weight: 700; font-size: 15px; }
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar nav a, .sidebar nav button.navlink {
+  appearance: none; border: 0; background: none; text-align: left; font: inherit; cursor: pointer;
+  display: block; padding: 9px 10px; border-radius: 7px; color: var(--ink); text-decoration: none;
+}
+.sidebar nav a:hover, .sidebar nav button.navlink:hover { background: var(--surface-2); }
+.sidebar nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sidebar nav button.navlink.logout { color: var(--crit); margin-top: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+@media (max-width: 760px) {
+  .app-shell { flex-direction: column; }
+  .sidebar { width: 100%; flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+}
+
+main#view { flex: 1; padding: 24px; max-width: 1080px; }
+
+/* login card */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.login-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 32px 28px; max-width: 360px; width: 100%; text-align: center;
+}
+.login-card .btn { margin-top: 10px; width: 100%; }
+
+/* toasts */
+#toasts {
+  position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px;
+  z-index: 1000; max-width: 320px;
+}
+.toast {
+  background: var(--ink); color: var(--surface); border-radius: 8px; padding: 10px 14px;
+  font-size: 13.5px; box-shadow: 0 4px 16px rgba(0,0,0,.18);
+}
+.toast.error { background: var(--crit); }
+.toast.ok { background: var(--ok); }
+
+/* placeholder view for unregistered / not-yet-built pages */
+.placeholder { padding: 40px; text-align: center; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
