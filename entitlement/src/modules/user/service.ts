@@ -1,7 +1,6 @@
 import { db } from '../../db/client'
-import { users, userCompanies, userRoles, roles, tenants, companies, userPermissions, permissions, presets, presetPermissions } from '../../db/schema'
+import { users, userCompanies, tenants, companies, userPermissions, permissions, presets, presetPermissions } from '../../db/schema'
 import { createZitadelUser } from '../../zitadel/client'
-import { canManageTenant } from '../../http/auth'
 import { allowedKeys } from '../package/allowed'
 import { checkQuota, tenantPackage } from '../package/service'
 import { eq, inArray, isNull, or, and } from 'drizzle-orm'
@@ -63,32 +62,9 @@ export async function addCompany(user: { id: number; tenantId: number }, company
   return { ok: true }
 }
 
-export async function assignRole(user: { id: number; tenantId: number }, roleSlug: string, companyId: number | null, callerClaims: Record<string, any>) {
-  // system ∪ tenant เดียวกัน (invariant เดียวกับ invite — resolver เชื่อ write path นี้)
-  const matches = await db.select().from(roles).where(and(eq(roles.slug, roleSlug), or(isNull(roles.tenantId), eq(roles.tenantId, user.tenantId))))
-  const role = matches.find(r => r.tenantId !== null) ?? matches[0]  // slug ชนระหว่าง system/tenant → เลือก tenant role
-  if (!role) throw { notFound: 'role' }
-  if (role.grantAll && !canManageTenant(callerClaims, user.tenantId)) throw { forbiddenRole: [role.slug] }
-  if (companyId !== null) {
-    // ต้องเป็นสมาชิก company อยู่แล้ว — resolver สร้าง grant เฉพาะ company ใน user_companies, กัน assign แล้ว no-op เงียบ
-    const [m] = await db.select().from(userCompanies).where(and(eq(userCompanies.userId, user.id), eq(userCompanies.companyId, companyId)))
-    if (!m) throw { invalidCompany: companyId }
-  }
-  await db.insert(userRoles).values({ userId: user.id, roleId: role.id, companyId }).onConflictDoNothing()
-  return { ok: true }
-}
-
-export async function revokeRole(user: { id: number; tenantId: number }, roleSlug: string, companyId: number | null) {
-  const matches = await db.select().from(roles).where(and(eq(roles.slug, roleSlug), or(isNull(roles.tenantId), eq(roles.tenantId, user.tenantId))))
-  if (!matches.length) throw { notFound: 'role' }
-  await db.delete(userRoles).where(and(eq(userRoles.userId, user.id), inArray(userRoles.roleId, matches.map(r => r.id)),
-    companyId === null ? isNull(userRoles.companyId) : eq(userRoles.companyId, companyId)))
-  return { ok: true }
-}
-
-// ถอน membership แล้วลบ role ที่ scope company นั้นด้วย — กัน role ผีกลับมาทำงานถ้า add membership กลับ
+// ถอน membership + สิทธิ์ scope company นั้น (กันสิทธิ์ผีกลับมาเมื่อ add กลับ)
 export async function removeCompany(userId: number, companyId: number) {
-  await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.companyId, companyId)))
+  await db.delete(userPermissions).where(and(eq(userPermissions.userId, userId), eq(userPermissions.companyId, companyId)))
   await db.delete(userCompanies).where(and(eq(userCompanies.userId, userId), eq(userCompanies.companyId, companyId)))
   return { ok: true }
 }

@@ -3,7 +3,7 @@ import { packages, packagePermissions, permissions, tenants, users, companies, u
 import { eq, inArray, and, count } from 'drizzle-orm'
 import type { CreatePackageInput } from '@platform/contracts'
 
-// เหมือน role/service.ts assignPermissions — resolve key → row, throw { missing } ถ้าหาไม่เจอ
+// resolve key → row, throw { missing } ถ้าหาไม่เจอ
 const resolveKeys = async (keys: string[]) => {
   const rows = await db.select().from(permissions).where(inArray(permissions.key, keys))
   const missing = keys.filter(k => !rows.some(r => r.key === k))
