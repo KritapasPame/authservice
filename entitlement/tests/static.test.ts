@@ -48,7 +48,8 @@ test('GET /admin/nope.js 404s for a missing file', async () => {
 test('existing JSON API routes under /admin are unaffected by the static wildcard', async () => {
   const app = createApp()
   const res = await app.handle(new Request('http://localhost/admin/overview'))
-  // no auth header supplied -> requireAuth should reject before ever reaching the file server;
-  // the important thing is it must NOT be handled as a static-file 404 (proves no route conflict).
+  // no auth header supplied -> requireAuth rejects (401, see tests/auth.test.ts) before ever
+  // reaching the file server; the important thing here is it must NOT be handled as a
+  // static-file 404 (proves no route conflict).
   expect(res.status).not.toBe(404)
 })
