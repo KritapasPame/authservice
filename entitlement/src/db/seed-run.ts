@@ -1,5 +1,5 @@
-import { seedSystemRoles } from '../modules/role/seed'
+import { seedBase } from './seed'
 
-await seedSystemRoles()
-console.log('seeded system roles')
+await seedBase()
+console.log('seeded')
 process.exit(0)

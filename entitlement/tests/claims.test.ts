@@ -2,11 +2,11 @@ import { test, expect } from 'bun:test'
 import { Elysia } from 'elysia'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/client'
-import { tenants, companies, users, userCompanies, userRoles, roles, rolePermissions, permissions, modules, tenantModules, platformAdmins } from '../src/db/schema'
+import { tenants, companies, users, userCompanies, userPermissions, permissions, modules, tenantModules, platformAdmins, packages, packagePermissions } from '../src/db/schema'
 import { env } from '../src/config/env'
 import type { PlatformClaims, Grant } from '@platform/contracts'
 
-const { seedSystemRoles } = await import('../src/modules/role/seed')
+const { seedBase } = await import('../src/db/seed')
 const { resolveClaims } = await import('../src/claims/resolver')
 const { claimsRouter } = await import('../src/claims/route')
 
@@ -34,19 +34,21 @@ async function enableModule(tenantId: number, key: string, enabled = true) {
     .onConflictDoUpdate({ target: [tenantModules.tenantId, tenantModules.moduleId], set: { enabled } })
 }
 
-// custom tenant role with the given permission keys (not grantAll) — mirrors an "hr_staff" style role
-async function makeCustomRole(tenantId: number, slug: string, permissionKeys: string[]) {
-  const [role] = await db.insert(roles).values({ tenantId, name: slug, slug, grantAll: false }).returning()
-  for (const key of permissionKeys) {
-    const [p] = await db.select().from(permissions).where(eq(permissions.key, key))
-    await db.insert(rolePermissions).values({ roleId: role.id, permissionId: p.id })
-  }
-  return role.id
+// V2 helper: tenant + esign module enabled + provisioned active user — ฐานร่วมของเคส V2
+async function mkTenantUser() {
+  const suffix = Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+  const tenantId = await makeTenant('mtu-' + suffix)
+  await enableModule(tenantId, 'esign')
+  const userId = await makeUser(tenantId, 'mtu-user-' + suffix)
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
+  const [user] = await db.select().from(users).where(eq(users.id, userId))
+  const [mod] = await db.select().from(modules).where(eq(modules.key, 'esign'))
+  return { tenant: tenant!, user: user!, moduleId: mod!.id }
 }
 
-async function getSystemRoleId(slug: string) {
-  const [row] = await db.select().from(roles).where(eq(roles.slug, slug))
-  return row.id
+async function permByKey(key: string) {
+  const [row] = await db.select().from(permissions).where(eq(permissions.key, key))
+  return row!
 }
 
 const post = (headers: Record<string, string>, body: unknown) =>
@@ -56,8 +58,8 @@ const post = (headers: Record<string, string>, body: unknown) =>
     body: JSON.stringify(body),
   }))
 
-test('Somchai scenario: grantAll role scoped to company A, custom hr role scoped to company B', async () => {
-  await seedSystemRoles()
+test('V2: company admin scoped to company A gets all allowed keys, userPermissions scoped to company B stays limited', async () => {
+  await seedBase()
   const tenantId = await makeTenant('somchai-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const companyB = await makeCompany(tenantId, 'Company B')
@@ -65,13 +67,15 @@ test('Somchai scenario: grantAll role scoped to company A, custom hr role scoped
   await enableModule(tenantId, 'esign')
 
   const userId = await makeUser(tenantId, 'somchai-' + Date.now())
-  await db.insert(userCompanies).values([{ userId, companyId: companyA }, { userId, companyId: companyB }])
-
-  const companyAdminId = await getSystemRoleId('company_admin')
-  const hrStaffId = await makeCustomRole(tenantId, 'hr_staff-' + Date.now(), ['employee.read', 'employee.write'])
-  await db.insert(userRoles).values([
-    { userId, roleId: companyAdminId, companyId: companyA },
-    { userId, roleId: hrStaffId, companyId: companyB },
+  await db.insert(userCompanies).values([
+    { userId, companyId: companyA, isAdmin: true },
+    { userId, companyId: companyB },
+  ])
+  const empRead = await permByKey('employee.read')
+  const empWrite = await permByKey('employee.write')
+  await db.insert(userPermissions).values([
+    { userId, companyId: companyB, permissionId: empRead.id },
+    { userId, companyId: companyB, permissionId: empWrite.id },
   ])
 
   const claims = await resolveClaims((await db.select().from(users).where(eq(users.id, userId)))[0]!.zitadelUserId) as TenantClaims
@@ -81,38 +85,45 @@ test('Somchai scenario: grantAll role scoped to company A, custom hr role scoped
   expect(claims.modules).toContain('hr')
   expect(claims.modules).toContain('esign')
 
-  expect(claims.grants[String(companyA)]!.roles).toEqual(['company_admin'])
-  expect(claims.grants[String(companyA)]!.permissions).toEqual(['*'])
+  expect(claims.grants[String(companyA)]!.roles).toEqual(['admin'])
+  expect(claims.grants[String(companyA)]!.permissions).not.toContain('*')
+  expect(claims.grants[String(companyA)]!.permissions).toContain('employee.read')
+  expect(claims.grants[String(companyA)]!.permissions).toContain('esign.document.sign')
+  expect(claims.grants[String(companyA)]!.permissions).toContain('tenant.user.manage')
 
   expect(claims.grants[String(companyB)]!.permissions.sort()).toEqual(['employee.read', 'employee.write'])
   expect(claims.grants[String(companyB)]!.permissions).not.toContain('*')
   expect(claims.grants[String(companyB)]!.permissions).not.toContain('esign.document.sign')
 
-  // cross-company leak check: company A must not pick up the hr_staff role slug, company B must not get '*'
-  expect(claims.grants[String(companyA)]!.roles.some(r => r.startsWith('hr_staff'))).toBe(false)
-  expect(claims.grants[String(companyB)]!.roles).toEqual(expect.arrayContaining([expect.stringContaining('hr_staff')]))
+  // cross-company leak check: company B (non-admin) ต้องไม่ได้ role admin หรือ management keys ของ company A
+  expect(claims.grants[String(companyB)]!.roles).toEqual([])
+  expect(claims.grants[String(companyB)]!.permissions).not.toContain('tenant.user.manage')
 })
 
-test('module filter: disabling hr for the tenant removes hr permissions from grants, grantAll still yields * elsewhere', async () => {
-  await seedSystemRoles()
+test('module filter: disabling hr for the tenant removes hr keys from every grant, management keys ยังอยู่ (bypass filter)', async () => {
+  await seedBase()
   const tenantId = await makeTenant('modfilter-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const companyB = await makeCompany(tenantId, 'Company B')
   await enableModule(tenantId, 'hr', true)
+  await enableModule(tenantId, 'esign', true)
 
   const userId = await makeUser(tenantId, 'modfilter-' + Date.now())
-  await db.insert(userCompanies).values([{ userId, companyId: companyA }, { userId, companyId: companyB }])
-
-  const companyAdminId = await getSystemRoleId('company_admin')
-  const hrStaffId = await makeCustomRole(tenantId, 'hr_staff-' + Date.now(), ['employee.read', 'employee.write'])
-  await db.insert(userRoles).values([
-    { userId, roleId: companyAdminId, companyId: companyA },
-    { userId, roleId: hrStaffId, companyId: companyB },
+  await db.insert(userCompanies).values([
+    { userId, companyId: companyA, isAdmin: true },
+    { userId, companyId: companyB },
+  ])
+  const empRead = await permByKey('employee.read')
+  const empWrite = await permByKey('employee.write')
+  await db.insert(userPermissions).values([
+    { userId, companyId: companyB, permissionId: empRead.id },
+    { userId, companyId: companyB, permissionId: empWrite.id },
   ])
 
   // sanity: with hr enabled, the permissions show up
   const zid = (await db.select().from(users).where(eq(users.id, userId)))[0]!.zitadelUserId
   const before = await resolveClaims(zid) as TenantClaims
+  expect(before.grants[String(companyA)]!.permissions).toContain('employee.read')
   expect(before.grants[String(companyB)]!.permissions.sort()).toEqual(['employee.read', 'employee.write'])
 
   // now disable hr for the tenant
@@ -120,11 +131,13 @@ test('module filter: disabling hr for the tenant removes hr permissions from gra
   const after = await resolveClaims(zid) as TenantClaims
   expect(after.modules).not.toContain('hr')
   expect(after.grants[String(companyB)]!.permissions).toEqual([])
-  expect(after.grants[String(companyA)]!.permissions).toEqual(['*']) // grantAll bypasses module filter (documented in src/http/auth.ts)
+  expect(after.grants[String(companyA)]!.permissions).not.toContain('employee.read')
+  expect(after.grants[String(companyA)]!.permissions).not.toContain('*')
+  expect(after.grants[String(companyA)]!.permissions).toContain('tenant.user.manage') // management keys ไม่ผ่าน filter โมดูล
 })
 
-test('tenant-wide role (companyId null) applies to every company the user belongs to', async () => {
-  await seedSystemRoles()
+test('userPermissions granted per-company ใช้ได้อิสระต่อกันในแต่ละบริษัทที่ user เป็นสมาชิก', async () => {
+  await seedBase()
   const tenantId = await makeTenant('tenantwide-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const companyB = await makeCompany(tenantId, 'Company B')
@@ -133,14 +146,59 @@ test('tenant-wide role (companyId null) applies to every company the user belong
   const userId = await makeUser(tenantId, 'tenantwide-' + Date.now())
   await db.insert(userCompanies).values([{ userId, companyId: companyA }, { userId, companyId: companyB }])
 
-  const hrStaffId = await makeCustomRole(tenantId, 'hr_staff-' + Date.now(), ['employee.read', 'employee.write'])
-  await db.insert(userRoles).values([{ userId, roleId: hrStaffId, companyId: null }])
+  const empRead = await permByKey('employee.read')
+  const empWrite = await permByKey('employee.write')
+  await db.insert(userPermissions).values([
+    { userId, companyId: companyA, permissionId: empRead.id }, { userId, companyId: companyA, permissionId: empWrite.id },
+    { userId, companyId: companyB, permissionId: empRead.id }, { userId, companyId: companyB, permissionId: empWrite.id },
+  ])
 
   const zid = (await db.select().from(users).where(eq(users.id, userId)))[0]!.zitadelUserId
   const claims = await resolveClaims(zid) as TenantClaims
 
   expect(claims.grants[String(companyA)]!.permissions.sort()).toEqual(['employee.read', 'employee.write'])
   expect(claims.grants[String(companyB)]!.permissions.sort()).toEqual(['employee.read', 'employee.write'])
+})
+
+test('V2: group admin ได้ทุกบริษัทใน tenant รวมที่ไม่เป็นสมาชิก, ไม่มี * ,มี management keys', async () => {
+  const { tenant, user } = await mkTenantUser()
+  const [a] = await db.insert(companies).values({ tenantId: tenant.id, name: 'A' }).returning()
+  const [b] = await db.insert(companies).values({ tenantId: tenant.id, name: 'B' }).returning()
+  await db.update(users).set({ isGroupAdmin: true }).where(eq(users.id, user.id))
+  const c = await resolveClaims(user.zitadelUserId) as any
+  expect(Object.keys(c.grants).sort()).toEqual([String(a.id), String(b.id)].sort())
+  expect(c.grants[String(a.id)].roles).toEqual(['groupcompanyadmin'])
+  expect(c.grants[String(a.id)].permissions).not.toContain('*')
+  expect(c.grants[String(a.id)].permissions).toContain('tenant.user.manage')
+})
+
+test('V2: user ธรรมดาได้ตามติ๊ก ∩ แพ็ค — เปลี่ยนแพ็คแล้ว key หายทันที', async () => {
+  const { tenant, user } = await mkTenantUser()
+  const [co] = await db.insert(companies).values({ tenantId: tenant.id, name: 'C' }).returning()
+  await db.insert(userCompanies).values({ userId: user.id, companyId: co.id })
+  const sign = (await db.select().from(permissions).where(eq(permissions.key, 'esign.document.sign')))[0]
+  const send = (await db.select().from(permissions).where(eq(permissions.key, 'esign.document.send')))[0]
+  await db.insert(userPermissions).values([{ userId: user.id, companyId: co.id, permissionId: sign.id }, { userId: user.id, companyId: co.id, permissionId: send.id }])
+  // ไม่มีแพ็ค → ได้ทั้งคู่ (จำกัดด้วยโมดูลอย่างเดียว)
+  expect((await resolveClaims(user.zitadelUserId) as any).grants[String(co.id)].permissions.sort()).toEqual(['esign.document.send', 'esign.document.sign'])
+  // แพ็คที่มีแค่ sign → send หาย
+  const [pkg] = await db.insert(packages).values({ name: 'B', slug: 'b-' + Date.now(), seatLimit: 20, companyLimit: 1, adminLimit: 1 }).returning()
+  await db.insert(packagePermissions).values({ packageId: pkg.id, permissionId: sign.id })
+  await db.update(tenants).set({ packageId: pkg.id }).where(eq(tenants.id, tenant.id))
+  const c = await resolveClaims(user.zitadelUserId) as any
+  expect(c.grants[String(co.id)].permissions).toEqual(['esign.document.sign'])
+  expect(c.package).toBe(pkg.slug)
+})
+
+test('V2: company admin ได้ allowed ทั้งชุดเฉพาะบริษัทตัวเอง', async () => {
+  const { tenant, user } = await mkTenantUser()
+  const [co] = await db.insert(companies).values({ tenantId: tenant.id, name: 'C' }).returning()
+  const [other] = await db.insert(companies).values({ tenantId: tenant.id, name: 'D' }).returning()
+  await db.insert(userCompanies).values({ userId: user.id, companyId: co.id, isAdmin: true })
+  const c = await resolveClaims(user.zitadelUserId) as any
+  expect(c.grants[String(co.id)].roles).toEqual(['admin'])
+  expect(c.grants[String(co.id)].permissions).toContain('esign.document.sign')
+  expect(c.grants[String(other.id)]).toBeUndefined()
 })
 
 test('superadmin (platform_admins row) → exactly {role: superadmin}', async () => {

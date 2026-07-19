@@ -3,10 +3,10 @@ import { Elysia } from 'elysia'
 import { createHmac } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/client'
-import { tenants, companies, users, userCompanies, userRoles, roles, platformAdmins } from '../src/db/schema'
+import { tenants, companies, users, userCompanies, platformAdmins } from '../src/db/schema'
 import { env } from '../src/config/env'
 
-const { seedSystemRoles } = await import('../src/modules/role/seed')
+const { seedBase } = await import('../src/db/seed')
 const { zitadelClaimsRouter } = await import('../src/claims/zitadel-route')
 
 const TEST_KEY = 'unit-test-zitadel-signing-key'
@@ -24,11 +24,6 @@ async function makeCompany(tenantId: number, name: string) {
 
 async function makeUser(tenantId: number, zitadelUserId: string) {
   const [row] = await db.insert(users).values({ zitadelUserId, tenantId, email: zitadelUserId + '@example.com', status: 'active' }).returning()
-  return row.id
-}
-
-async function getSystemRoleId(slug: string) {
-  const [row] = await db.select().from(roles).where(eq(roles.slug, slug))
   return row.id
 }
 
@@ -62,13 +57,12 @@ async function post(raw: string, signatureHeader?: string) {
 }
 
 test('correctly signed request for a provisioned tenant user → 200 + append_claims with exact keys and round-tripped grants', async () => {
-  await seedSystemRoles()
+  await seedBase()
   const tenantId = await makeTenant('zw-tenant-' + Date.now())
   const companyA = await makeCompany(tenantId, 'Company A')
   const userId = await makeUser(tenantId, 'zw-user-' + Date.now())
-  await db.insert(userCompanies).values([{ userId, companyId: companyA }])
-  const companyAdminId = await getSystemRoleId('company_admin')
-  await db.insert(userRoles).values([{ userId, roleId: companyAdminId, companyId: companyA }])
+  // V2: company admin คือ userCompanies.isAdmin ไม่ใช่ role ต่อไป — ไม่มี '*' ต่ำกว่า superadmin
+  await db.insert(userCompanies).values([{ userId, companyId: companyA, isAdmin: true }])
   const zid = (await db.select().from(users).where(eq(users.id, userId)))[0]!.zitadelUserId
 
   const raw = JSON.stringify(zitadelPayload(zid))
@@ -81,12 +75,14 @@ test('correctly signed request for a provisioned tenant user → 200 + append_cl
     'urn:platform:modules',
     'urn:platform:grants',
   ])
-  const byKey = Object.fromEntries(body.append_claims.map(c => [c.key, c.value]))
+  const byKey = Object.fromEntries(body.append_claims.map(c => [c.key, c.value])) as Record<string, any>
   expect(byKey['urn:platform:tenantId']).toBe(tenantId)
   expect(byKey['urn:platform:companies']).toEqual([companyA])
-  expect(byKey['urn:platform:grants']).toEqual({
-    [String(companyA)]: { roles: ['company_admin'], permissions: ['*'] },
-  })
+  const grants = byKey['urn:platform:grants']
+  expect(grants[String(companyA)].roles).toEqual(['admin'])
+  expect(grants[String(companyA)].permissions).not.toContain('*')
+  expect(grants[String(companyA)].permissions).toContain('tenant.user.manage')
+  expect(grants[String(companyA)].permissions).toContain('tenant.company.manage')
 })
 
 test('superadmin user → response appends exactly urn:platform:role', async () => {

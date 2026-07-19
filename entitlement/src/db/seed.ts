@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
-import { db } from '../../db/client'
-import { modules, permissions, roles } from '../../db/schema'
+import { db } from './client'
+import { modules, permissions } from './schema'
 
 const MODULES = [
   { key: 'core', name: 'Core' },
@@ -13,16 +13,16 @@ const PERMISSIONS = [
   { key: 'tenant.user.manage', moduleKey: 'core' },
   { key: 'employee.read', moduleKey: 'hr' },
   { key: 'employee.write', moduleKey: 'hr' },
+  { key: 'esign.document.read', moduleKey: 'esign' },
+  { key: 'esign.document.create', moduleKey: 'esign' },
   { key: 'esign.document.sign', moduleKey: 'esign' },
+  { key: 'esign.document.send', moduleKey: 'esign' },
+  { key: 'esign.template.manage', moduleKey: 'esign' },
+  { key: 'esign.audit.report', moduleKey: 'esign' },
 ]
 
-const SYSTEM_ROLES = [
-  { slug: 'group_admin', name: 'Group Admin' },
-  { slug: 'company_admin', name: 'Company Admin' },
-]
-
-// idempotent — safe to call repeatedly, never touches existing rows
-export async function seedSystemRoles() {
+// idempotent — เรียกซ้ำได้ ไม่แตะ row เดิม
+export async function seedBase() {
   const moduleByKey = new Map<string, number>()
   for (const m of MODULES) {
     const [existing] = await db.select().from(modules).where(eq(modules.key, m.key))
@@ -31,15 +31,8 @@ export async function seedSystemRoles() {
       ?? (await db.select().from(modules).where(eq(modules.key, m.key)))[0]!
     moduleByKey.set(m.key, row.id)
   }
-
   for (const p of PERMISSIONS) {
     const [existing] = await db.select().from(permissions).where(eq(permissions.key, p.key))
     if (!existing) await db.insert(permissions).values({ key: p.key, moduleId: moduleByKey.get(p.moduleKey)! }).onConflictDoNothing()
-  }
-
-  for (const r of SYSTEM_ROLES) {
-    // onConflictDoNothing on roles_tenant_slug_uq (S4) — safe under concurrent seed calls, not just check-then-insert
-    await db.insert(roles).values({ slug: r.slug, name: r.name, tenantId: null, grantAll: true })
-      .onConflictDoNothing({ target: [roles.tenantId, roles.slug] })
   }
 }
