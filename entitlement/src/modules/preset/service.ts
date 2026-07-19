@@ -1,6 +1,6 @@
 import { db } from '../../db/client'
 import { presets, presetPermissions, permissions } from '../../db/schema'
-import { eq, inArray, isNull, or, and } from 'drizzle-orm'
+import { eq, inArray, isNull, or } from 'drizzle-orm'
 import type { CreatePresetInput } from '@platform/contracts'
 
 const resolveKeys = async (keys: string[]) => {
@@ -28,11 +28,11 @@ export async function createPreset(i: CreatePresetInput) {
 export const getPreset = async (id: number) => (await db.select().from(presets).where(eq(presets.id, id)))[0]
 
 export async function updatePreset(id: number, i: { name?: string; permissionKeys?: string[] }) {
+  const rows = i.permissionKeys ? await resolveKeys(i.permissionKeys) : undefined
   if (i.name) await db.update(presets).set({ name: i.name }).where(eq(presets.id, id))
   if (i.permissionKeys) {
-    const rows = await resolveKeys(i.permissionKeys)
     await db.delete(presetPermissions).where(eq(presetPermissions.presetId, id))
-    if (rows.length) await db.insert(presetPermissions).values(rows.map(r => ({ presetId: id, permissionId: r.id })))
+    if (rows!.length) await db.insert(presetPermissions).values(rows!.map(r => ({ presetId: id, permissionId: r.id })))
   }
   return { ok: true }
 }

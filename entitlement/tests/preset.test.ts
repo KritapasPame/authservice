@@ -106,3 +106,13 @@ test('PUT/DELETE preset ที่ไม่มีจริง → 404', async () 
   expect((await req('PUT', '/presets/999999999', { authorization: superadmin }, { name: 'X' })).status).toBe(404)
   expect((await req('DELETE', '/presets/999999999', { authorization: superadmin })).status).toBe(404)
 })
+
+test('PUT /presets/:id name ใหม่ + permissionKeys มั่ว → 404 {missing}, name ไม่เปลี่ยน (กัน partial write)', async () => {
+  const { tenant } = await makeTenant()
+  const created = await (await req('POST', '/presets', { authorization: superadmin }, { tenantId: tenant.id, name: 'เดิม', slug: `partial-${Date.now()}-${++seq}`, permissionKeys: [] })).json()
+  const put = await req('PUT', `/presets/${created.id}`, { authorization: superadmin }, { name: 'ใหม่', permissionKeys: ['no.such.key'] })
+  expect(put.status).toBe(404)
+  expect(await put.json()).toEqual({ missing: ['no.such.key'] })
+  const list = await (await req('GET', `/presets/${tenant.id}`, { authorization: superadmin })).json()
+  expect(list.find((p: any) => p.id === created.id).name).toBe('เดิม')
+})
