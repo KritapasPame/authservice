@@ -1,0 +1,553 @@
+<title>Mockup — Auth Platform Admin</title>
+<style>
+  :root {
+    --ground: #F6F8F7;
+    --surface: #FFFFFF;
+    --surface-2: #EEF2F0;
+    --ink: #1B2420;
+    --muted: #5F6E68;
+    --line: #DCE3E0;
+    --accent: #0E7A6E;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E0F0ED;
+    --ok: #177245;
+    --ok-soft: #E2F2E8;
+    --warn: #9A5B00;
+    --warn-soft: #F7EDDA;
+    --new: #24518F;
+    --new-soft: #E3EBF6;
+    --crit: #A82F2F;
+    --crit-soft: #F6E4E4;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #101614; --surface: #182019; --surface-2: #1F2A25;
+      --ink: #E6ECE9; --muted: #93A39C; --line: #2C3833;
+      --accent: #34B3A2; --accent-ink: #0C1512; --accent-soft: #1B332E;
+      --ok: #52C784; --ok-soft: #16311F; --warn: #E0A64A; --warn-soft: #33290F;
+      --new: #7CA6E0; --new-soft: #17273D; --crit: #E07B7B; --crit-soft: #3A1B1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101614; --surface: #182019; --surface-2: #1F2A25;
+    --ink: #E6ECE9; --muted: #93A39C; --line: #2C3833;
+    --accent: #34B3A2; --accent-ink: #0C1512; --accent-soft: #1B332E;
+    --ok: #52C784; --ok-soft: #16311F; --warn: #E0A64A; --warn-soft: #33290F;
+    --new: #7CA6E0; --new-soft: #17273D; --crit: #E07B7B; --crit-soft: #3A1B1B;
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F8F7; --surface: #FFFFFF; --surface-2: #EEF2F0;
+    --ink: #1B2420; --muted: #5F6E68; --line: #DCE3E0;
+    --accent: #0E7A6E; --accent-ink: #FFFFFF; --accent-soft: #E0F0ED;
+    --ok: #177245; --ok-soft: #E2F2E8; --warn: #9A5B00; --warn-soft: #F7EDDA;
+    --new: #24518F; --new-soft: #E3EBF6; --crit: #A82F2F; --crit-soft: #F6E4E4;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans Thai", "Segoe UI", "Sarabun", sans-serif;
+    font-size: 15px; line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.top { margin-bottom: 6px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  h1 { font-size: 26px; margin: 4px 0 2px; text-wrap: balance; }
+  .sub { color: var(--muted); margin: 0 0 18px; max-width: 62ch; }
+
+  /* legend */
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; font-size: 13px; color: var(--muted); }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .b-ok   { background: var(--ok-soft); color: var(--ok); }
+  .b-warn { background: var(--warn-soft); color: var(--warn); }
+  .b-new  { background: var(--new-soft); color: var(--new); }
+  .b-crit { background: var(--crit-soft); color: var(--crit); }
+
+  /* tabs */
+  .tabs { display: flex; gap: 6px; border-bottom: 2px solid var(--line); margin-bottom: 0; flex-wrap: wrap; }
+  .tabs button {
+    appearance: none; border: 0; background: none; color: var(--muted);
+    font: inherit; font-weight: 600; padding: 10px 14px; cursor: pointer;
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+  }
+  .tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .tabnote { font-size: 12px; font-weight: 400; color: var(--muted); display: block; }
+
+  /* app frame */
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .frame {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    margin-top: 20px; overflow: hidden;
+  }
+  .framebar {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted);
+  }
+  .framebar .who { margin-left: auto; font-weight: 600; }
+  .framebody { padding: 20px; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tile { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; }
+  .tile .k { font-size: 12.5px; color: var(--muted); }
+  .tile .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tile .v small { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+  /* tables */
+  .tblwrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 5px; padding: 1px 7px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+  .chip.off { background: var(--surface-2); color: var(--muted); text-decoration: line-through; }
+
+  /* api chips */
+  .api { font-family: var(--mono); font-size: 11px; background: var(--surface-2); border: 1px dashed var(--line); color: var(--muted); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+  .api b { color: var(--accent); font-weight: 700; }
+
+  /* buttons & controls */
+  .btn { appearance: none; font: inherit; font-weight: 600; border-radius: 7px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.small { padding: 4px 10px; font-size: 13px; }
+  select, input[type="text"] { font: inherit; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .toggle input { position: absolute; opacity: 0; }
+  .toggle .tk { width: 34px; height: 20px; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; flex: none; }
+  .toggle .tk::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); transition: left .15s; }
+  .toggle input:checked + .tk { background: var(--accent); }
+  .toggle input:checked + .tk::after { left: 16px; }
+  .toggle input:focus-visible + .tk { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* screen 3 layout */
+  .perm-layout { display: grid; grid-template-columns: 240px 1fr; gap: 18px; }
+  @media (max-width: 760px) { .perm-layout { grid-template-columns: 1fr; } }
+  .userlist { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; align-self: start; }
+  .userlist button {
+    display: block; width: 100%; text-align: left; appearance: none; border: 0; background: none;
+    font: inherit; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--line); color: var(--ink);
+  }
+  .userlist button:last-child { border-bottom: 0; }
+  .userlist button[aria-selected="true"] { background: var(--accent-soft); }
+  .userlist .em { font-size: 12.5px; color: var(--muted); display: block; }
+
+  .ctabs { display: flex; gap: 6px; margin: 14px 0 10px; flex-wrap: wrap; }
+  .ctabs button { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+  .ctabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  fieldset.pgroup { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 10px 14px 12px; }
+  fieldset.pgroup legend { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 0 6px; }
+  .perm { display: flex; align-items: center; gap: 9px; padding: 5px 0; }
+  .perm input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .perm .key { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .perm label { cursor: pointer; }
+
+  .adminbox { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .adminbox .note { font-size: 12.5px; color: var(--muted); }
+
+  .savebar { display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+  .drift { font-size: 13px; }
+
+  /* api log */
+  .apilog { margin-top: 18px; background: var(--surface-2); border-radius: 8px; padding: 12px 14px; }
+  .apilog h4 { margin: 0 0 8px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .apilog pre { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--ink); max-height: 220px; overflow: auto; }
+  .apilog .hint { color: var(--muted); font-size: 13px; }
+
+  /* api summary table */
+  .apisummary { margin-top: 26px; }
+  .apisummary h3 { font-size: 16px; margin: 0 0 8px; }
+  .apisummary td:first-child { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+
+  section.docnote { margin-top: 26px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 18px; }
+  section.docnote h3 { margin: 0 0 6px; font-size: 15px; }
+  section.docnote p, section.docnote li { font-size: 14px; color: var(--muted); }
+  section.docnote code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Mockup · Phase นี้</div>
+    <h1>หน้าจัดการระบบ Auth — 3 หน้าหลัก</h1>
+    <p class="sub">แบบ A: role ตายตัว 3 ตัว (superadmin / groupcompanyadmin / admin) ที่เหลือมอง permission รายคนต่อบริษัท — ตำแหน่งเป็น preset กด save แล้ว copy ลงรายคน ทุกปุ่มติดป้าย API ไว้เช็ค flow จริง</p>
+    <div class="legend">
+      สถานะ API:
+      <span class="badge b-ok">มีแล้ว</span>
+      <span class="badge b-warn">ต้องแก้</span>
+      <span class="badge b-new">ใหม่ (แบบ A)</span>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-screen="s1">1 · ลูกค้าทั้งหมด<span class="tabnote">superadmin</span></button>
+    <button role="tab" aria-selected="false" data-screen="spkg">2 · แพ็กเกจ<span class="tabnote">superadmin</span></button>
+    <button role="tab" aria-selected="false" data-screen="s2">3 · รายละเอียดลูกค้า<span class="tabnote">superadmin</span></button>
+    <button role="tab" aria-selected="false" data-screen="s3">4 · ตั้งสิทธิ์ราย user<span class="tabnote">groupcompanyadmin / admin</span></button>
+  </div>
+
+  <!-- ═══════════ SCREEN 1 : customer list ═══════════ -->
+  <div class="screen active" id="s1">
+    <div class="frame">
+      <div class="framebar">🔐 Platform Console · ลูกค้าทั้งหมด <span class="who">login เป็น: superadmin</span></div>
+      <div class="framebody">
+        <div class="tiles">
+          <div class="tile"><div class="k">ลูกค้าองค์กร</div><div class="v">3</div></div>
+          <div class="tile"><div class="k">ลูกค้า Personal</div><div class="v">27</div></div>
+          <div class="tile"><div class="k">Users ทั้งหมด</div><div class="v">183</div></div>
+          <div class="tile"><div class="k">Login 7 วันล่าสุด</div><div class="v">412 <small>ครั้ง</small></div></div>
+          <div class="tile"><div class="k">ใกล้เต็มโควตา</div><div class="v" style="color:var(--warn)">1 <small>ราย</small></div></div>
+        </div>
+        <p style="margin:0 0 10px"><span class="api"><b>GET</b> /admin/overview</span> <span class="badge b-warn">ต้องแก้</span> <span style="font-size:13px;color:var(--muted)">— ตอนนี้มีแล้วแต่ต้องขยายให้คืนสรุปราย tenant (จำนวน user, module, โควตา)</span></p>
+        <div class="ctabs" role="tablist" aria-label="กรองประเภทลูกค้า" style="margin:0 0 10px">
+          <button aria-selected="true">ทั้งหมด</button>
+          <button aria-selected="false">องค์กร</button>
+          <button aria-selected="false">บุคคล (Personal)</button>
+        </div>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>ลูกค้า (tenant)</th><th>แพ็กเกจ</th><th>Users ใช้ / โควตา</th><th>บริษัทในเครือ</th><th>สถานะ</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>เจริญกรุ๊ป</strong><br><span style="font-size:12.5px;color:var(--muted)">charoen-group</span></td>
+                <td><span class="chip">Pro</span><br><span style="font-size:12px;color:var(--muted)">eSign</span></td>
+                <td class="num">48 / 50 <span class="badge b-warn">ใกล้เต็ม</span></td>
+                <td class="num">3</td>
+                <td><span class="badge b-ok">active</span></td>
+                <td><button class="btn small" onclick="goScreen('s2')">ดูรายละเอียด →</button></td>
+              </tr>
+              <tr>
+                <td><strong>สยามพาณิชย์โฮลดิ้ง</strong><br><span style="font-size:12.5px;color:var(--muted)">siam-holding</span></td>
+                <td><span class="chip">Max</span><br><span style="font-size:12px;color:var(--muted)">eSign</span></td>
+                <td class="num">92 / 200</td>
+                <td class="num">5</td>
+                <td><span class="badge b-ok">active</span></td>
+                <td><button class="btn small">ดูรายละเอียด →</button></td>
+              </tr>
+              <tr>
+                <td><strong>บ. ทดสอบระบบ</strong><br><span style="font-size:12.5px;color:var(--muted)">pilot-demo</span></td>
+                <td><span class="chip">Basic</span><br><span style="font-size:12px;color:var(--muted)">eSign</span></td>
+                <td class="num">16 / 20</td>
+                <td class="num">1</td>
+                <td><span class="badge b-warn">trial</span></td>
+                <td><button class="btn small">ดูรายละเอียด →</button></td>
+              </tr>
+              <tr>
+                <td><strong>สมศรี ใจงาม</strong><br><span style="font-size:12.5px;color:var(--muted)">somsri@gmail.com · สมัครเอง 12 ก.ค.</span></td>
+                <td><span class="chip">Personal</span><br><span style="font-size:12px;color:var(--muted)">eSign</span></td>
+                <td class="num">1 / 1</td>
+                <td class="num" style="color:var(--muted)">—</td>
+                <td><span class="badge b-ok">active</span></td>
+                <td><button class="btn small">ดูรายละเอียด →</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:14px 0 0"><button class="btn primary">+ เพิ่มลูกค้าใหม่</button> <span class="api"><b>POST</b> /tenants</span> <span class="badge b-ok">มีแล้ว</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ SCREEN : packages ═══════════ -->
+  <div class="screen" id="spkg">
+    <div class="frame">
+      <div class="framebar">🔐 Platform Console · แพ็กเกจ <span class="who">login เป็น: superadmin</span></div>
+      <div class="framebody">
+        <p style="margin:0 0 12px"><span class="api"><b>GET</b> /admin/packages</span> <span class="badge b-new">ใหม่</span> <span style="font-size:13px;color:var(--muted)">— นิยามแพ็กเกจ: โควตา + function ที่ใช้ได้ ลูกค้าแต่ละเจ้าผูกกับแพ็กเกจเดียว</span></p>
+        <div class="tblwrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width:200px"></th>
+                <th style="text-align:center">Personal</th>
+                <th style="text-align:center">Basic</th>
+                <th style="text-align:center;color:var(--accent)">Pro</th>
+                <th style="text-align:center">Max</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="5" style="font-weight:700;background:var(--surface-2)">การสมัคร / โควตา</td></tr>
+              <tr><td>วิธีเริ่มใช้</td><td style="text-align:center;font-size:13px">สมัครเองทันที<br><span style="color:var(--muted);font-size:12px">self-signup</span></td><td style="text-align:center;font-size:13px" colspan="3">ทีมขาย/superadmin เปิดให้</td></tr>
+              <tr><td>Users (ที่นั่ง)</td><td class="num" style="text-align:center">1</td><td class="num" style="text-align:center">20</td><td class="num" style="text-align:center">50</td><td class="num" style="text-align:center">200</td></tr>
+              <tr><td>เอกสาร / เดือน</td><td class="num" style="text-align:center">10</td><td class="num" style="text-align:center">ไม่จำกัด</td><td class="num" style="text-align:center">ไม่จำกัด</td><td class="num" style="text-align:center">ไม่จำกัด</td></tr>
+              <tr><td>บริษัทในเครือ (group company)</td><td style="text-align:center;color:var(--muted)">—</td><td class="num" style="text-align:center">1</td><td class="num" style="text-align:center">3</td><td class="num" style="text-align:center">ไม่จำกัด</td></tr>
+              <tr><td>แอดมิน (admin ต่อบริษัท รวมกัน)</td><td style="text-align:center;color:var(--muted)">—</td><td class="num" style="text-align:center">1</td><td class="num" style="text-align:center">3</td><td class="num" style="text-align:center">10</td></tr>
+              <tr><td>groupcompanyadmin</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td colspan="5" style="font-weight:700;background:var(--surface-2)">Function — eSign</td></tr>
+              <tr><td>ดูเอกสาร <span class="key" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">esign.doc.read</span></td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td>สร้างเอกสาร <span class="key" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">esign.doc.create</span></td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td>ลงนามเอกสาร <span class="key" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">esign.doc.sign</span></td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td>ส่งเอกสารให้ผู้อื่นลงนาม <span class="key" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">esign.doc.send</span></td><td style="text-align:center;color:var(--ok)">✓ <span style="color:var(--muted);font-size:11px">(ตามโควตา/เดือน)</span></td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td>จัดการเทมเพลต <span class="key" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">esign.template.manage</span></td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--ok)">✓</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td>รายงาน / audit log <span class="key" style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">esign.audit.report</span></td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--ok)">✓</td></tr>
+              <tr><td colspan="5" style="font-weight:700;background:var(--surface-2)">โมดูล (phase หน้า)</td></tr>
+              <tr><td>HR</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">—</td><td style="text-align:center;color:var(--muted)">ซื้อเพิ่มได้</td></tr>
+              <tr>
+                <td style="font-weight:700">ลูกค้าที่ใช้อยู่</td>
+                <td style="text-align:center;font-size:13px">27 ราย<br><span style="color:var(--muted);font-size:12px">สมัครเอง</span></td>
+                <td style="text-align:center;font-size:13px">1 ราย<br><span style="color:var(--muted);font-size:12px">บ. ทดสอบระบบ</span></td>
+                <td style="text-align:center;font-size:13px">1 ราย<br><span style="color:var(--muted);font-size:12px">เจริญกรุ๊ป</span></td>
+                <td style="text-align:center;font-size:13px">1 ราย<br><span style="color:var(--muted);font-size:12px">สยามพาณิชย์โฮลดิ้ง</span></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="text-align:center"><button class="btn small">แก้ไข</button></td>
+                <td style="text-align:center"><button class="btn small">แก้ไข</button></td>
+                <td style="text-align:center"><button class="btn small">แก้ไข</button></td>
+                <td style="text-align:center"><button class="btn small">แก้ไข</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:14px 0 0">
+          <button class="btn primary">+ สร้างแพ็กเกจใหม่</button>
+          <span class="api"><b>POST</b> /admin/packages</span> · <span class="api"><b>PUT</b> /admin/packages/:id</span> <span class="badge b-new">ใหม่</span>
+        </p>
+        <div class="adminbox" style="margin-top:14px">
+          <div class="note"><strong>กลไกฝั่งระบบ:</strong> function ที่ไม่อยู่ในแพ็กเกจ = permission key นั้นถูกกรองออกจาก claims ทั้ง tenant (resolver กรองแบบเดียวกับ tenant_modules ตอนนี้) และหน้า "ตั้งสิทธิ์ราย user" จะ disable ช่องติ๊กพร้อมป้ายบอกว่าเกินแพ็กเกจ — แก้แพ็กเกจกลางทางมีผลทันทีทั้ง tenant ตอนออก token ใหม่</div>
+          <div class="note"><strong>Personal = tenant ขนาด 1 คน:</strong> สมัครเอง <span class="api"><b>POST</b> /signup/personal</span> <span class="badge b-new">ใหม่</span> → ระบบสร้าง tenant <code style="font-family:var(--mono);font-size:12px">type='personal'</code> + ใส่สิทธิ์ตามแพ็ค Personal อัตโนมัติ ไม่มีหน้าจัดการทีม/บริษัท — อยากชวนคนเพิ่มเมื่อไหร่ = อัปเกรดเป็น Basic ขึ้นไป (เปลี่ยนแพ็กเกจ ไม่ต้องย้ายข้อมูล)</div>
+          <div class="note">ตัวเลขโควตา/ราคาในตารางเป็น mock — ตั้งจริงได้จากปุ่มแก้ไข</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ SCREEN 2 : customer detail ═══════════ -->
+  <div class="screen" id="s2">
+    <div class="frame">
+      <div class="framebar">🔐 Platform Console · ลูกค้า: <strong>เจริญกรุ๊ป</strong> <span class="who">login เป็น: superadmin</span></div>
+      <div class="framebody">
+        <p style="margin:0 0 4px"><span class="api"><b>GET</b> /admin/tenants/:id</span> <span class="badge b-new">ใหม่</span> <span style="font-size:13px;color:var(--muted)">— รวม: ข้อมูล tenant + module + จำนวน user ต่อบริษัท + โควตา ในเส้นเดียว</span></p>
+
+        <h3 style="margin:18px 0 8px;font-size:15px">แพ็กเกจที่ซื้อ</h3>
+        <div class="adminbox">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span class="chip" style="font-size:14px;padding:3px 12px">Pro</span>
+            <select><option>Basic</option><option selected>Pro</option><option>Max</option></select>
+            <button class="btn small">เปลี่ยนแพ็กเกจ</button>
+            <span class="api"><b>PATCH</b> /admin/tenants/:id/package</span> <span class="badge b-new">ใหม่</span>
+          </div>
+          <div class="note">การใช้เทียบโควตา — Users: <strong>48 / 50</strong> <span class="badge b-warn">ใกล้เต็ม</span> · บริษัทในเครือ: <strong>3 / 3</strong> <span class="badge b-warn">เต็ม</span> · แอดมิน: <strong>2 / 3</strong> — เกินโควตาแล้วระบบไม่ให้เพิ่ม (invite/สร้างบริษัท/ตั้งแอดมิน จะได้ 403 พร้อมเหตุผล)</div>
+          <label class="toggle"><input type="checkbox"><span class="tk"></span> HR — เปิดเพิ่มรายเจ้า (override นอกแพ็กเกจ) <span class="api"><b>PUT</b> /modules/tenants/1/hr</span> <span class="badge b-ok">มีแล้ว</span></label>
+        </div>
+
+        <h3 style="margin:18px 0 8px;font-size:15px">บริษัทในเครือ + จำนวนผู้ใช้</h3>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>บริษัท</th><th>Users</th><th>แอดมินบริษัท</th><th>สถานะ</th></tr></thead>
+            <tbody>
+              <tr><td>บจก. เจริญค้าปลีก</td><td class="num">21</td><td>สมหญิง ใจดี</td><td><span class="badge b-ok">active</span></td></tr>
+              <tr><td>บจก. เจริญโลจิสติกส์</td><td class="num">18</td><td>วีระ ขยัน</td><td><span class="badge b-ok">active</span></td></tr>
+              <tr><td>บจก. เจริญพร็อพเพอร์ตี้</td><td class="num">9</td><td>—</td><td><span class="badge b-ok">active</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:8px 0 0"><span class="api"><b>GET</b> /companies/:tenantId</span> <span class="badge b-warn">ต้องแก้</span> <span style="font-size:13px;color:var(--muted)">— มีแล้วแต่ต้องเพิ่มจำนวน user + ชื่อแอดมินต่อบริษัท</span></p>
+
+        <h3 style="margin:18px 0 8px;font-size:15px">บิล / ใบเสร็จ</h3>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>เลขที่</th><th>รายการ</th><th>ยอด</th><th>สถานะ</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td>INV-2026-0042</td><td>Pro · ก.ค. 2026</td><td class="num">2,990.00</td>
+                <td><span class="badge b-ok">ชำระแล้ว 1 ก.ค.</span></td>
+                <td><button class="btn small" onclick="window.print()">🖨 Invoice</button> <button class="btn small" onclick="window.print()">🖨 ใบเสร็จ</button></td>
+              </tr>
+              <tr>
+                <td>INV-2026-0057</td><td>Pro · ส.ค. 2026</td><td class="num">2,990.00</td>
+                <td><span class="badge b-warn">รอชำระ</span></td>
+                <td><button class="btn small" onclick="window.print()">🖨 Invoice</button> <button class="btn small">✓ บันทึกรับเงิน</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:8px 0 0">
+          <button class="btn small">+ ออก invoice ใหม่</button>
+          <span class="api"><b>GET·POST</b> /admin/tenants/:id/invoices</span> · <span class="api"><b>GET</b> /admin/invoices/:no/print?type=invoice|receipt</span> · <span class="api"><b>PATCH</b> /admin/invoices/:no/paid</span> <span class="badge b-new">ใหม่</span>
+          <span style="font-size:13px;color:var(--muted)">— print = หน้า HTML สำหรับพิมพ์/บันทึก PDF · บันทึกรับเงินแล้วถึงพิมพ์ใบเสร็จได้ · ยังไม่ต่อ payment gateway (เก็บเงินโอน/manual)</span>
+        </p>
+
+        <h3 style="margin:20px 0 8px;font-size:15px">Login ล่าสุด (customer service ใช้ตอบปัญหา "เข้าระบบไม่ได้")</h3>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>เวลา</th><th>ผู้ใช้</th><th>ผล</th></tr></thead>
+            <tbody>
+              <tr><td>19 ก.ค. 14:02</td><td>somchai@charoen.co.th</td><td><span class="badge b-ok">สำเร็จ</span></td></tr>
+              <tr><td>19 ก.ค. 13:47</td><td>malee@charoen.co.th</td><td><span class="badge b-crit">รหัสผิด ×3</span></td></tr>
+              <tr><td>19 ก.ค. 11:20</td><td>weera@charoen.co.th</td><td><span class="badge b-ok">สำเร็จ</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:8px 0 0"><span class="api"><b>GET</b> /admin/logins</span> <span class="badge b-warn">ต้องแก้</span> <span style="font-size:13px;color:var(--muted)">— มีแล้ว (ดึงจาก Zitadel) แต่ต้อง filter ราย tenant ได้</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ SCREEN 3 : per-user permission ═══════════ -->
+  <div class="screen" id="s3">
+    <div class="frame">
+      <div class="framebar">🏢 เจริญกรุ๊ป · จัดการผู้ใช้ <span class="who">login เป็น: groupcompanyadmin (วิชัย)</span></div>
+      <div class="framebody">
+        <div class="perm-layout">
+          <div>
+            <div class="userlist" role="tablist" aria-label="รายชื่อผู้ใช้">
+              <button aria-selected="true">สมชาย รักงาน<span class="em">somchai@charoen.co.th · Staff</span></button>
+              <button aria-selected="false">มาลี สายบัว<span class="em">malee@charoen.co.th · Supervisor</span></button>
+              <button aria-selected="false">สมหญิง ใจดี<span class="em">somying@charoen.co.th · แอดมินบริษัท</span></button>
+            </div>
+            <p style="margin:10px 0 0"><span class="api"><b>GET</b> /admin-ui/tenants/:id/users</span> <span class="badge b-new">ใหม่</span></p>
+            <p style="margin:8px 0 0"><button class="btn small">+ เชิญผู้ใช้ใหม่</button><br><span class="api"><b>POST</b> /users/invite</span> <span class="badge b-warn">ต้องแก้</span> <span style="font-size:12.5px;color:var(--muted)">เปลี่ยน roleSlugs → preset/permissions</span></p>
+          </div>
+
+          <div>
+            <h3 style="margin:0 0 2px;font-size:17px">สมชาย รักงาน</h3>
+            <p style="margin:0 0 6px;font-size:13.5px;color:var(--muted)">สมาชิก 2 บริษัท — สิทธิ์ตั้งแยกต่อบริษัท</p>
+
+            <div class="adminbox">
+              <label class="toggle"><input type="checkbox" id="grpadmin"><span class="tk"></span> แอดมินทั้งเครือ (groupcompanyadmin) <span class="api"><b>PATCH</b> /users/:id/admin</span> <span class="badge b-new">ใหม่</span></label>
+              <div class="note">เปิดแล้วได้สิทธิ์ <code style="font-family:var(--mono)">*</code> ทุกบริษัทในเครือ — ช่องติ๊กด้านล่างจะไม่มีผล</div>
+            </div>
+
+            <div class="ctabs" role="tablist" aria-label="เลือกบริษัท">
+              <button aria-selected="true" onclick="pickCompany(this,1)">บจก. เจริญค้าปลีก</button>
+              <button aria-selected="false" onclick="pickCompany(this,2)">บจก. เจริญโลจิสติกส์</button>
+            </div>
+
+            <div class="adminbox">
+              <label class="toggle"><input type="checkbox" id="coadmin"><span class="tk"></span> แอดมินบริษัทนี้ (admin) <span class="api"><b>PATCH</b> /users/:id/admin</span> <span class="badge b-new">ใหม่</span></label>
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+              <label for="preset" style="font-weight:600">ตำแหน่ง (preset):</label>
+              <select id="preset" onchange="applyPreset(this.value)">
+                <option value="">— กำหนดเอง —</option>
+                <option value="staff" selected>Staff (3 สิทธิ์)</option>
+                <option value="supervisor">Supervisor (5 สิทธิ์)</option>
+                <option value="viewer">Viewer (1 สิทธิ์)</option>
+              </select>
+              <span class="api"><b>GET</b> /presets/:tenantId</span> <span class="badge b-new">ใหม่</span>
+              <span class="drift" id="drift"></span>
+            </div>
+
+            <fieldset class="pgroup" id="permbox">
+              <legend>eSign</legend>
+              <div class="perm"><input type="checkbox" id="p1" checked onchange="markDrift()"><label for="p1">ดูเอกสาร <span class="key">esign.doc.read</span></label></div>
+              <div class="perm"><input type="checkbox" id="p2" checked onchange="markDrift()"><label for="p2">สร้างเอกสาร <span class="key">esign.doc.create</span></label></div>
+              <div class="perm"><input type="checkbox" id="p3" checked onchange="markDrift()"><label for="p3">ลงนามเอกสาร <span class="key">esign.doc.sign</span></label></div>
+              <div class="perm"><input type="checkbox" id="p4" onchange="markDrift()"><label for="p4">ส่งเอกสารให้ผู้อื่นลงนาม <span class="key">esign.doc.send</span></label></div>
+              <div class="perm"><input type="checkbox" id="p5" onchange="markDrift()"><label for="p5">จัดการเทมเพลต <span class="key">esign.template.manage</span></label></div>
+              <div class="perm" style="opacity:.55"><input type="checkbox" disabled><label>รายงาน / audit log <span class="key">esign.audit.report</span></label> <span class="badge b-warn">Max เท่านั้น — แพ็กเกจปัจจุบัน Pro</span></div>
+            </fieldset>
+            <p style="margin:0 0 10px"><span class="api"><b>GET</b> /users/:id/permissions?companyId=1</span> <span class="badge b-new">ใหม่</span></p>
+
+            <div class="savebar">
+              <button class="btn primary" onclick="saveNow()">บันทึกสิทธิ์</button>
+              <span class="api"><b>PUT</b> /users/:id/permissions</span> <span class="badge b-new">ใหม่</span>
+              <span style="font-size:13px;color:var(--muted)">save = copy ลงรายคน — แก้ preset ทีหลังไม่กระทบคนนี้</span>
+            </div>
+
+            <div class="apilog">
+              <h4>API log — flow จริงที่จะยิง</h4>
+              <pre id="log"><span class="hint">ลองเปลี่ยน preset / ติ๊กสิทธิ์ / กดบันทึก แล้วดูว่า API ไหนถูกเรียก</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ API summary ═══════════ -->
+  <section class="apisummary">
+    <h3>สรุป API ทุกเส้นของ 3 หน้านี้</h3>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>ใช้ในหน้า</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+        <tbody>
+          <tr><td>GET /tenants · POST /tenants</td><td>1</td><td><span class="badge b-ok">มีแล้ว</span></td><td>list / สร้างลูกค้า</td></tr>
+          <tr><td>GET /admin/overview</td><td>1</td><td><span class="badge b-warn">ต้องแก้</span></td><td>เพิ่มสรุปราย tenant: users, module, โควตา</td></tr>
+          <tr><td>GET/POST/PUT /admin/packages</td><td>2</td><td><span class="badge b-new">ใหม่</span></td><td>นิยามแพ็กเกจ: โควตา + function ที่ใช้ได้</td></tr>
+          <tr><td>POST /signup/personal</td><td>2</td><td><span class="badge b-new">ใหม่</span></td><td>public — สมัคร Personal เอง (Zitadel register + สร้าง tenant type=personal)</td></tr>
+          <tr><td>GET·POST /admin/tenants/:id/invoices + print/paid</td><td>3</td><td><span class="badge b-new">ใหม่</span></td><td>ออก invoice / พิมพ์ invoice·ใบเสร็จ / บันทึกรับเงิน (manual, ไม่มี gateway)</td></tr>
+          <tr><td>PATCH /admin/tenants/:id/package</td><td>2·3</td><td><span class="badge b-new">ใหม่</span></td><td>ผูกลูกค้ากับแพ็กเกจ</td></tr>
+          <tr><td>GET /admin/tenants/:id</td><td>3</td><td><span class="badge b-new">ใหม่</span></td><td>รายละเอียดลูกค้าเส้นเดียวจบ (รวม usage เทียบโควตา)</td></tr>
+          <tr><td>PUT /modules/tenants/:tid/:key</td><td>3</td><td><span class="badge b-ok">มีแล้ว</span></td><td>เปิด/ปิดโมดูล override รายเจ้า</td></tr>
+          <tr><td>GET /companies/:tenantId</td><td>3</td><td><span class="badge b-warn">ต้องแก้</span></td><td>เพิ่มจำนวน user ต่อบริษัท</td></tr>
+          <tr><td>GET /admin/logins</td><td>3</td><td><span class="badge b-warn">ต้องแก้</span></td><td>เพิ่ม filter ราย tenant</td></tr>
+          <tr><td>GET /admin-ui/tenants/:id/users</td><td>4</td><td><span class="badge b-new">ใหม่</span></td><td>รายชื่อ user + ตำแหน่ง + สถานะ</td></tr>
+          <tr><td>POST /users/invite</td><td>4</td><td><span class="badge b-warn">ต้องแก้</span></td><td>รับ preset/permissions แทน roleSlugs + เช็คโควตาแพ็กเกจ</td></tr>
+          <tr><td>PATCH /users/:id/admin</td><td>4</td><td><span class="badge b-new">ใหม่</span></td><td>ตั้ง groupcompanyadmin / admin ต่อบริษัท + เช็คโควตาแอดมิน</td></tr>
+          <tr><td>GET+PUT /users/:id/permissions</td><td>4</td><td><span class="badge b-new">ใหม่</span></td><td>หัวใจแบบ A — อ่าน/เขียนสิทธิ์รายคนต่อบริษัท (กรองตามแพ็กเกจ)</td></tr>
+          <tr><td>GET/POST/PUT /presets</td><td>4</td><td><span class="badge b-new">ใหม่</span></td><td>จัดการตำแหน่ง preset (แทนตาราง roles เดิม)</td></tr>
+          <tr><td>PATCH /users/:id/status</td><td>4</td><td><span class="badge b-ok">มีแล้ว</span></td><td>เปิด/ปิดผู้ใช้</td></tr>
+          <tr><td>POST·DELETE /users/:id/companies</td><td>4</td><td><span class="badge b-ok">มีแล้ว</span></td><td>ย้าย/เพิ่ม user เข้าบริษัท + เช็คโควตาบริษัท</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="docnote">
+    <h3>สิ่งที่ DB ยังไม่มี (ต้องเพิ่มก่อนต่อ API จริง)</h3>
+    <ul style="margin:6px 0;padding-left:20px">
+      <li><code>user_permissions (user_id, company_id, permission_id)</code> — source of truth สิทธิ์รายคน</li>
+      <li><code>users.is_group_admin</code> + <code>user_companies.is_admin</code> — role ตายตัว 2 ตัวฝั่งลูกค้า</li>
+      <li><code>user_companies.position</code> — ป้ายตำแหน่ง (แสดงผลอย่างเดียว)</li>
+      <li><code>presets</code> + <code>preset_permissions</code> — แทน roles/role_permissions เดิม</li>
+      <li><code>packages (id, name, seat_limit, company_limit, admin_limit, doc_limit_monthly, allow_group_admin, self_signup)</code> + <code>package_permissions</code> — นิยามแพ็กเกจ + function ที่ใช้ได้</li>
+      <li><code>tenants.package_id</code> + <code>tenants.type ('org' | 'personal')</code> — เจ้าไหนซื้อแพ็กไหน / เป็นองค์กรหรือบุคคล</li>
+      <li><code>invoices (id, tenant_id, number, description, amount, status, issued_at, paid_at)</code> — บิล/ใบเสร็จ (พิมพ์จากหน้า HTML)</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+  function goScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+    document.querySelectorAll('.tabs [role=tab]').forEach(t => t.setAttribute('aria-selected', String(t.dataset.screen === id)));
+    window.scrollTo({ top: 0 });
+  }
+  document.querySelectorAll('.tabs [role=tab]').forEach(t => t.addEventListener('click', () => goScreen(t.dataset.screen)));
+
+  const PRESETS = { staff: ['p1','p2','p3'], supervisor: ['p1','p2','p3','p4','p5'], viewer: ['p1'] };
+  const KEYS = { p1:'esign.doc.read', p2:'esign.doc.create', p3:'esign.doc.sign', p4:'esign.doc.send', p5:'esign.template.manage' };
+  let company = 1;
+
+  function logLine(s) {
+    const el = document.getElementById('log');
+    if (el.querySelector('.hint')) el.textContent = '';
+    el.textContent += s + '\n';
+    el.scrollTop = el.scrollHeight;
+  }
+  function applyPreset(name) {
+    if (!name) return;
+    Object.keys(KEYS).forEach(id => document.getElementById(id).checked = PRESETS[name].includes(id));
+    document.getElementById('drift').textContent = '';
+    logLine(`GET /presets/1  → เลือก "${name}" เติมติ๊ก ${PRESETS[name].length} สิทธิ์ (ยังไม่บันทึก)`);
+  }
+  function markDrift() {
+    const sel = document.getElementById('preset');
+    if (sel.value) document.getElementById('drift').innerHTML = '<span class="badge b-warn">แก้จาก preset แล้ว</span>';
+  }
+  function pickCompany(btn, id) {
+    company = id;
+    document.querySelectorAll('.ctabs button').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    logLine(`GET /users/42/permissions?companyId=${id}  → โหลดสิทธิ์ของบริษัทนี้`);
+  }
+  function saveNow() {
+    const checked = Object.keys(KEYS).filter(id => document.getElementById(id).checked).map(id => KEYS[id]);
+    const pos = document.getElementById('preset');
+    const posName = pos.options[pos.selectedIndex].text.split(' (')[0];
+    logLine(`PUT /users/42/permissions\n  { companyId: ${company}, position: ${pos.value ? '"'+posName+'"' : 'null'},\n    permissionKeys: [${checked.map(k=>'"'+k+'"').join(', ')}] }\n  → 200 { ok: true }  (copy ลงรายคน จบ ไม่ผูกกับ preset)`);
+  }
+  document.getElementById('grpadmin').addEventListener('change', e =>
+    logLine(`PATCH /users/42/admin  { groupAdmin: ${e.target.checked} }  → สิทธิ์ * ทุกบริษัทในเครือ`));
+  document.getElementById('coadmin').addEventListener('change', e =>
+    logLine(`PATCH /users/42/admin  { companyId: ${company}, admin: ${e.target.checked} }  → สิทธิ์ * เฉพาะบริษัทนี้`));
+</script>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auth Platform Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="config.js"></script>
+</head>
+<body>
+
+  <div id="login" class="login-wrap" hidden>
+    <div class="login-card">
+      <div class="eyebrow">Platform Console</div>
+      <h1>เข้าสู่ระบบผู้ดูแล</h1>
+      <p class="sub">ล็อกอินด้วยบัญชีผู้ดูแลระบบ (Zitadel)</p>
+      <button id="loginBtn" class="btn primary">เข้าสู่ระบบ</button>
+    </div>
+  </div>
+
+  <div id="app" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand">🔐 Platform Console</div>
+      <nav>
+        <a href="#/customers" data-superadmin>ลูกค้าทั้งหมด</a>
+        <a href="#/packages" data-superadmin>แพ็กเกจ</a>
+        <a href="#/permissions">ตั้งสิทธิ์ผู้ใช้</a>
+        <button id="logoutBtn" type="button" class="navlink logout">ออกจากระบบ</button>
+      </nav>
+    </aside>
+    <main id="view"></main>
+  </div>
+
+  <div id="toasts"></div>
+
+  <script type="module">
+    import { handleCallback, getToken, isSuperadmin, login, logout } from './src/auth.js'
+    import { startRouter } from './src/router.js'
+    import { toast } from './src/api.js'
+    // page modules self-register their route on import (see src/router.js) — each task owns
+    // one line here and never needs to touch this file's logic.
+    import './src/pages/customers.js'
+    import './src/pages/packages.js'
+    import './src/pages/tenant.js'
+    import './src/pages/permissions.js'
+
+    async function boot() {
+      if (new URLSearchParams(window.location.search).get('code')) {
+        try {
+          await handleCallback()
+        } catch (err) {
+          console.error(err)
+          toast('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่')
+        }
+      }
+
+      const loginEl = document.getElementById('login')
+      const appEl = document.getElementById('app')
+
+      if (!getToken()) {
+        loginEl.hidden = false
+        appEl.hidden = true
+        document.getElementById('loginBtn').addEventListener('click', () => login())
+        return
+      }
+
+      loginEl.hidden = true
+      appEl.hidden = false
+      document.getElementById('logoutBtn').addEventListener('click', () => logout())
+
+      if (!window.location.hash || window.location.hash === '#/') {
+        window.location.hash = isSuperadmin() ? '#/customers' : '#/permissions'
+      }
+      startRouter()
+    }
+
+    boot()
+  </script>
+</body>
+</html>
