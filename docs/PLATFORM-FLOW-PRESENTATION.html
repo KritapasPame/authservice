@@ -1,0 +1,285 @@
+<title>Auth Platform — ภาพรวมระบบและความคืบหน้า</title>
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --panel: #FFFFFF;
+    --ink: #16211D;
+    --muted: #5C6B65;
+    --line: #E2E7E4;
+    --teal: #0E7A6E;
+    --teal-soft: #E3F1EE;
+    --amber: #A76A00;
+    --amber-soft: #FBF0DC;
+    --slate: #38506E;
+    --slate-soft: #E8EEF6;
+    --grey-soft: #EFF1F0;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1513; --panel: #17201D; --ink: #E7EDEA; --muted: #94A49D; --line: #2A3733;
+      --teal: #3EBFAC; --teal-soft: #17332E; --amber: #DDA34A; --amber-soft: #33280F;
+      --slate: #8FB0DA; --slate-soft: #182333; --grey-soft: #1E2825;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1513; --panel: #17201D; --ink: #E7EDEA; --muted: #94A49D; --line: #2A3733;
+    --teal: #3EBFAC; --teal-soft: #17332E; --amber: #DDA34A; --amber-soft: #33280F;
+    --slate: #8FB0DA; --slate-soft: #182333; --grey-soft: #1E2825;
+  }
+  :root[data-theme="light"] {
+    --bg: #FAFAF8; --panel: #FFFFFF; --ink: #16211D; --muted: #5C6B65; --line: #E2E7E4;
+    --teal: #0E7A6E; --teal-soft: #E3F1EE; --amber: #A76A00; --amber-soft: #FBF0DC;
+    --slate: #38506E; --slate-soft: #E8EEF6; --grey-soft: #EFF1F0;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.6;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 24px 90px; }
+
+  header.hero { margin-bottom: 34px; }
+  .eyebrow { font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: 32px; line-height: 1.25; margin: 8px 0 6px; text-wrap: balance; }
+  .lede { color: var(--muted); margin: 0; max-width: 60ch; font-size: 17px; }
+  .stamp { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+
+  h2 {
+    font-size: 21px; margin: 42px 0 4px; padding-top: 22px; border-top: 2px solid var(--line);
+  }
+  h2 .n { color: var(--teal); font-family: var(--mono); font-size: 15px; margin-right: 10px; }
+  .h2sub { color: var(--muted); margin: 0 0 18px; font-size: 15px; }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+
+  /* ---- layer diagram ---- */
+  .layers { display: flex; flex-direction: column; gap: 10px; }
+  .layer {
+    background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--teal);
+    border-radius: 10px; padding: 14px 18px;
+  }
+  .layer.b2 { border-left-color: var(--slate); }
+  .layer.b3 { border-left-color: var(--amber); }
+  .layer .tag { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .layer .name { font-size: 17px; font-weight: 700; margin: 2px 0 4px; }
+  .layer .what { color: var(--muted); font-size: 14.5px; }
+  .arrow { text-align: center; color: var(--muted); font-size: 20px; line-height: 1; }
+
+  /* ---- flow steps ---- */
+  ol.flow { list-style: none; counter-reset: f; padding: 0; margin: 0; }
+  ol.flow li {
+    counter-increment: f; position: relative; padding: 0 0 20px 46px; border-left: 2px solid var(--line);
+    margin-left: 15px;
+  }
+  ol.flow li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  ol.flow li::before {
+    content: counter(f); position: absolute; left: -16px; top: -2px;
+    width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: #fff;
+    display: grid; place-items: center; font-size: 14px; font-weight: 700; font-family: var(--mono);
+  }
+  ol.flow .t { font-weight: 700; }
+  ol.flow .d { color: var(--muted); font-size: 14.5px; }
+  ol.flow code { font-family: var(--mono); font-size: 12.5px; background: var(--grey-soft); padding: 1px 6px; border-radius: 4px; }
+
+  /* ---- status ---- */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .b-done { background: var(--teal-soft); color: var(--teal); }
+  .b-now  { background: var(--amber-soft); color: var(--amber); }
+  .b-next { background: var(--slate-soft); color: var(--slate); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card .k { font-size: 13px; color: var(--muted); }
+  .card .v { font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .card .v small { font-size: 14px; font-weight: 400; color: var(--muted); }
+
+  .tblwrap { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th {
+    text-align: left; font-size: 12px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; padding: 9px 12px; border-bottom: 2px solid var(--line); white-space: nowrap;
+  }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  ul.plain { margin: 8px 0; padding-left: 20px; }
+  ul.plain li { margin-bottom: 6px; }
+  ul.plain .muted { color: var(--muted); }
+
+  .callout {
+    background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--amber);
+    border-radius: 10px; padding: 16px 20px; margin: 20px 0;
+  }
+  .callout.good { border-left-color: var(--teal); }
+  .callout h4 { margin: 0 0 6px; font-size: 15.5px; }
+  .callout p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  footer { margin-top: 46px; padding-top: 18px; border-top: 2px solid var(--line); color: var(--muted); font-size: 13.5px; }
+
+  @media print {
+    body { background: #fff; font-size: 12pt; }
+    .wrap { max-width: none; padding: 0; }
+    h2 { page-break-after: avoid; }
+    .layer, .card, .callout, table { page-break-inside: avoid; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">EDM Platform · Internal Update</div>
+    <h1>ระบบ Auth กลาง — ภาพรวมและความคืบหน้า</h1>
+    <p class="lede">ระบบยืนยันตัวตนและสิทธิ์กลางที่ทุกแอปในเครือ (eSign, HR, ระบบอนาคต) ใช้ร่วมกัน — ล็อกอินครั้งเดียวใช้ได้ทุกแอป และคุมสิทธิ์รายคนได้ถึงระดับบริษัทในเครือ</p>
+    <div class="stamp">อัปเดต 20 กรกฎาคม 2026 · สภาพแวดล้อม pre-test</div>
+  </header>
+
+  <h2><span class="n">01</span>ระบบประกอบด้วยอะไรบ้าง</h2>
+  <p class="h2sub">แบ่ง 3 ชั้น แต่ละชั้นทำหน้าที่เดียว เปลี่ยนชั้นใดชั้นหนึ่งไม่กระทบชั้นอื่น</p>
+
+  <div class="layers">
+    <div class="layer">
+      <div class="tag">ชั้นที่ 1 · ตัวตน</div>
+      <div class="name">Zitadel — จัดการรหัสผ่านและการล็อกอิน</div>
+      <div class="what">ซอฟต์แวร์สำเร็จรูปที่เราติดตั้งบนเซิร์ฟเวอร์ตัวเอง ดูแลรหัสผ่าน, ยืนยันตัวตน 2 ชั้น (MFA), passkey, และการเชื่อมกับ SSO ขององค์กรลูกค้า — เราไม่เขียนส่วนนี้เอง เพราะบั๊กด้านความปลอดภัยมีความเสี่ยงสูงเกินไป</div>
+    </div>
+    <div class="arrow">↓ ออกบัตรผ่าน (token)</div>
+    <div class="layer b2">
+      <div class="tag">ชั้นที่ 2 · สิทธิ์ — เราพัฒนาเอง</div>
+      <div class="name">Entitlement Service — ใครทำอะไรได้บ้าง</div>
+      <div class="what">หัวใจของธุรกิจ: ลูกค้า (tenant), บริษัทในเครือ, ผู้ใช้, สิทธิ์รายคน, แพ็กเกจที่ซื้อ และโควตา — ตอนออกบัตรผ่าน ระบบจะฝังสิทธิ์เหล่านี้ลงในบัตรให้อัตโนมัติ</div>
+    </div>
+    <div class="arrow">↓ บัตรผ่านที่มีสิทธิ์ครบ</div>
+    <div class="layer b3">
+      <div class="tag">ชั้นที่ 3 · แอปที่ผู้ใช้เห็น</div>
+      <div class="name">eSign · Admin Console · HR (อนาคต)</div>
+      <div class="what">แต่ละแอปแค่ตรวจบัตรผ่านแล้วแสดงเฉพาะสิ่งที่ผู้ใช้มีสิทธิ์ ไม่ต้องเก็บรหัสผ่าน ไม่ต้องรู้เรื่องสิทธิ์เอง</div>
+    </div>
+  </div>
+
+  <h2><span class="n">02</span>ผู้ใช้ล็อกอินแล้วเกิดอะไรขึ้น</h2>
+  <p class="h2sub">ทั้งหมดนี้ใช้เวลาไม่ถึง 1 วินาที ผู้ใช้เห็นแค่หน้าล็อกอินกับหน้าแอป</p>
+
+  <ol class="flow">
+    <li>
+      <div class="t">ผู้ใช้เปิดแอป (เช่น eSign) โดยยังไม่ได้ล็อกอิน</div>
+      <div class="d">แอปส่งผู้ใช้ไปหน้าล็อกอินกลางของเราโดยอัตโนมัติ</div>
+    </li>
+    <li>
+      <div class="t">กรอกอีเมลและรหัสผ่านที่หน้าล็อกอินกลาง</div>
+      <div class="d">หน้านี้เป็นแบรนด์ของเรา ผู้ใช้ไม่เห็นหน้าจอของซอฟต์แวร์เบื้องหลังเลย · ถ้าองค์กรตั้งให้ต้องยืนยัน 2 ชั้นหรือใช้ passkey ระบบจะถามต่อตรงนี้</div>
+    </li>
+    <li>
+      <div class="t">ระบบตรวจรหัสผ่านแล้วเรียกดูสิทธิ์จาก Entitlement Service</div>
+      <div class="d">ถามว่า “คนนี้อยู่ลูกค้าเจ้าไหน บริษัทอะไรบ้าง ทำอะไรได้บ้าง แพ็กเกจเปิดฟังก์ชันไหนไว้”</div>
+    </li>
+    <li>
+      <div class="t">ออกบัตรผ่านที่ฝังสิทธิ์ไว้ในตัว</div>
+      <div class="d">บัตรใบเดียวบอกครบว่าใคร สังกัดใคร ทำอะไรได้ที่บริษัทไหน — และปลอมไม่ได้เพราะมีลายเซ็นดิจิทัล</div>
+    </li>
+    <li>
+      <div class="t">กลับเข้าแอป ใช้งานได้ทันที</div>
+      <div class="d">แอปตรวจลายเซ็นบัตรเองได้ ไม่ต้องถามกลับมาที่ระบบกลางทุกครั้ง — เร็วและไม่เป็นคอขวด</div>
+    </li>
+    <li>
+      <div class="t">เปิดแอปอื่นในเครือ ไม่ต้องล็อกอินซ้ำ</div>
+      <div class="d">นี่คือ SSO — บัตรใบเดิมใช้ได้ทุกแอป</div>
+    </li>
+  </ol>
+
+  <h2><span class="n">03</span>สิทธิ์ทำงานอย่างไร</h2>
+  <p class="h2sub">ออกแบบใหม่เมื่อสัปดาห์นี้ ให้มองที่ “รายคน” แทนการผูกกับตำแหน่ง</p>
+
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>ระดับ</th><th>ใคร</th><th>ทำอะไรได้</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Superadmin</strong></td><td>ทีมเรา</td><td>ดูแลลูกค้าทุกเจ้า ตั้งแพ็กเกจ ออกบิล ตอบปัญหาลูกค้า</td></tr>
+        <tr><td><strong>แอดมินทั้งเครือ</strong></td><td>ลูกค้า</td><td>จัดการได้ทุกบริษัทในเครือของตัวเอง</td></tr>
+        <tr><td><strong>แอดมินบริษัท</strong></td><td>ลูกค้า</td><td>จัดการเฉพาะบริษัทที่ดูแล</td></tr>
+        <tr><td><strong>ผู้ใช้ทั่วไป</strong></td><td>ลูกค้า</td><td>ทำได้เฉพาะสิทธิ์ที่แอดมินติ๊กให้ — <strong>ตั้งแยกได้ต่อบริษัท</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout good">
+    <h4>จุดต่างจากระบบทั่วไป: ตำแหน่งเป็นแค่ “แม่แบบ” ไม่ใช่กรอบตายตัว</h4>
+    <p>แอดมินเลือกตำแหน่ง เช่น “พนักงานทั่วไป” ระบบจะติ๊กสิทธิ์ชุดมาตรฐานให้ทันที แล้วแอดมินปรับเพิ่ม–ลดรายคนได้ก่อนบันทึก — นาย ก. กับ นาย ข. เป็นพนักงานเหมือนกันแต่สิทธิ์ต่างกันได้ และการแก้แม่แบบทีหลังจะไม่กระทบคนที่ตั้งไปแล้ว</p>
+  </div>
+
+  <p style="color:var(--muted);font-size:14.5px">นอกจากนี้ <strong>แพ็กเกจที่ลูกค้าซื้อเป็นเพดานสูงสุดเสมอ</strong> — ฟังก์ชันที่ไม่ได้อยู่ในแพ็กเกจ ต่อให้เป็นแอดมินก็ใช้ไม่ได้ และระบบบังคับโควตาจำนวนผู้ใช้ / บริษัท / แอดมิน ให้อัตโนมัติ</p>
+
+  <h2><span class="n">04</span>ตอนนี้ทำถึงไหนแล้ว</h2>
+  <p class="h2sub">งานหลักของ Phase 1 เสร็จและใช้งานได้จริงบนเซิร์ฟเวอร์ทดสอบแล้ว</p>
+
+  <div class="cards">
+    <div class="card"><div class="k">โครงสร้างพื้นฐาน + ระบบสิทธิ์</div><div class="v" style="color:var(--teal)">เสร็จ</div></div>
+    <div class="card"><div class="k">หน้าจอผู้ดูแลระบบ</div><div class="v" style="color:var(--teal)">4 <small>หน้า เสร็จ</small></div></div>
+    <div class="card"><div class="k">ชุดทดสอบอัตโนมัติ</div><div class="v">129 <small>ผ่านทั้งหมด</small></div></div>
+    <div class="card"><div class="k">คงเหลือใน Phase 1</div><div class="v" style="color:var(--amber)">2 <small>งาน</small></div></div>
+  </div>
+
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th style="width:44%">งาน</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+      <tbody>
+        <tr><td>ติดตั้ง Zitadel + ฐานข้อมูล + โดเมน/ใบรับรอง</td><td><span class="badge b-done">เสร็จ</span></td><td>รันบนเซิร์ฟเวอร์ทดสอบแล้ว</td></tr>
+        <tr><td>ฝังสิทธิ์ลงบัตรผ่านอัตโนมัติ</td><td><span class="badge b-done">เสร็จ</span></td><td>ทดสอบครบวงจรจริงแล้ว</td></tr>
+        <tr><td>ระบบสิทธิ์รายคน + แพ็กเกจ + โควตา</td><td><span class="badge b-done">เสร็จ</span></td><td>ออกแบบใหม่และส่งมอบสัปดาห์นี้</td></tr>
+        <tr><td>ระบบออกใบแจ้งหนี้/ใบเสร็จ (แบบพื้นฐาน)</td><td><span class="badge b-done">เสร็จ</span></td><td>บันทึกรับเงินเอง ยังไม่ต่อระบบชำระเงิน</td></tr>
+        <tr><td>สมัครใช้งานเองสำหรับลูกค้ารายบุคคล</td><td><span class="badge b-done">เสร็จ</span></td><td>ยังไม่เปิดสู่สาธารณะ — รอเพิ่มการยืนยันอีเมล</td></tr>
+        <tr><td>หน้าจอผู้ดูแล 4 หน้า (ลูกค้า / แพ็กเกจ / รายละเอียด / ตั้งสิทธิ์)</td><td><span class="badge b-done">เสร็จ</span></td><td>ใช้งานได้จริงบนเซิร์ฟเวอร์ทดสอบแล้ว</td></tr>
+        <tr><td>หน้าล็อกอินกลางแบรนด์เรา</td><td><span class="badge b-now">กำลังทำ</span></td><td>ปรับหน้าตาเสร็จแล้ว เหลือทดสอบกับผู้ใช้จริง</td></tr>
+        <tr><td>เชื่อม eSign เป็นแอปแรก</td><td><span class="badge b-next">ถัดไป</span></td><td>ฝั่ง Auth เตรียมของให้ครบแล้ว รอฝั่ง eSign ต่อ</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">05</span>Phase 1 จะจบสัปดาห์นี้ไหม</h2>
+
+  <div class="callout">
+    <h4>คำตอบตรง ๆ: งานฝั่งระบบ Auth จบได้ในสัปดาห์นี้ — แต่ Phase 1 ทั้งหมดยังไม่จบ</h4>
+    <p>เพราะเส้นชัยของ Phase 1 คือ “ผู้ใช้ล็อกอินผ่านหน้าจอของเราแล้วใช้ eSign ได้จริง” ซึ่งมีงานฝั่ง eSign ที่ยังไม่เริ่ม และไม่ได้อยู่ในมือทีม Auth</p>
+  </div>
+
+  <h3>เหลืออะไรบ้าง</h3>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th style="width:40%">งานที่เหลือ</th><th>ใครทำ</th><th>ประเมิน</th></tr></thead>
+      <tbody>
+        <tr><td>ทดสอบหน้าล็อกอินกลางกับผู้ใช้จริง</td><td>ทีม Auth</td><td>1–2 วัน</td></tr>
+        <tr><td>เชื่อม eSign เข้าระบบล็อกอิน + อ่านสิทธิ์จากบัตรผ่าน</td><td>ทีม eSign</td><td>ขึ้นกับคิวของทีม</td></tr>
+        <tr><td>ทดสอบครบวงจรกับผู้ใช้ทดลอง</td><td>ทั้งสองทีม</td><td>1–2 วัน หลังงานข้างบนเสร็จ</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>ก่อนเปิดใช้จริงกับลูกค้า ต้องมีเพิ่ม</h3>
+  <ul class="plain">
+    <li>ยืนยันอีเมลตอนสมัครเอง <span class="muted">— ตอนนี้เซิร์ฟเวอร์ทดสอบยังไม่ได้ต่อระบบส่งอีเมล</span></li>
+    <li>จำกัดจำนวนครั้งการสมัคร <span class="muted">— กันการสมัครถล่มจากบอท</span></li>
+    <li>ต่อระบบชำระเงิน <span class="muted">— ปัจจุบันบันทึกรับเงินด้วยมือ ซึ่งเพียงพอสำหรับช่วงทดลอง</span></li>
+  </ul>
+
+  <h2><span class="n">06</span>หลังจากนี้</h2>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>ลำดับ</th><th>เรื่อง</th><th>ทำไม</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>eSign ใช้งานได้ครบวงจร</td><td>พิสูจน์ว่าระบบทำงานจริงกับแอปแรก</td></tr>
+        <tr><td>2</td><td>เปิดสมัครใช้งานเองสู่สาธารณะ</td><td>เริ่มขายแบบรายเดือนได้ ไม่ต้องเปิดบัญชีให้ทีละราย</td></tr>
+        <tr><td>3</td><td>ล็อกอินด้วย Google / Apple</td><td>ลดแรงเสียดทานตอนสมัคร <span class="muted">(Apple มีค่าใช้จ่าย 99 ดอลลาร์ต่อปี)</span></td></tr>
+        <tr><td>4</td><td>ย้ายระบบ HR เข้ามาใช้สิทธิ์ชุดเดียวกัน</td><td>เลื่อนไว้ตั้งใจ — ทำทีละแอปเพื่อลดความเสี่ยง</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout good">
+    <h4>สิ่งที่ได้แล้วตอนนี้</h4>
+    <p>ระบบตัวตนกลางที่ครบพอจะขายให้ลูกค้าองค์กร — ล็อกอินครั้งเดียวใช้ได้ทุกแอป, ยืนยันตัวตน 2 ชั้นและ passkey พร้อมใช้, คุมสิทธิ์รายคนถึงระดับบริษัทในเครือ, ขายเป็นแพ็กเกจพร้อมโควตาอัตโนมัติ และมีหน้าจอให้ทีมซัพพอร์ตดูแลลูกค้าได้เอง</p>
+  </div>
+
+  <footer>
+    เอกสารนี้สรุปสถานะ ณ 20 กรกฎาคม 2026 · สภาพแวดล้อม pre-test (ยังไม่ใช่ระบบจริง) · จัดทำโดยทีม Auth Service
+  </footer>
+</div>
