@@ -30,7 +30,9 @@ async function serveFile(requestPath: string) {
   const file = Bun.file(target)
   if (!(await file.exists())) return new Response('not found', { status: 404 })
 
-  const headers: Record<string, string> = {}
+  // no-cache = ให้ browser/CDN (Cloudflare cache .js/.css ตาม extension) revalidate ทุกครั้ง —
+  // ไฟล์ไม่ได้ทำ content hash ถ้าปล่อยให้ cache จะเจอ config/โค้ดเก่าค้างหลัง deploy
+  const headers: Record<string, string> = { 'Cache-Control': 'no-cache' }
   const type = MIME[extname(target)]
   if (type) headers['Content-Type'] = type
   return new Response(file, { headers })

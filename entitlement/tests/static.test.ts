@@ -56,3 +56,11 @@ test('existing JSON API routes under /admin are unaffected by the static wildcar
   // static-file 404 (proves no route conflict).
   expect(res.status).not.toBe(404)
 })
+
+test('static files ส่ง Cache-Control: no-cache (กัน CDN/browser cache ค้างหลัง deploy)', async () => {
+  const app = createApp()
+  for (const p of ['/admin/', '/admin/config.js', '/admin/styles.css']) {
+    const res = await app.handle(new Request('http://localhost' + p))
+    expect(res.headers.get('cache-control')).toBe('no-cache')
+  }
+})
