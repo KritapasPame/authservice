@@ -6,6 +6,9 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$root/dist-packages"
+# build ก่อน pack เสมอ — ตั้งแต่ v1.2.0 tarball มีทั้ง src (bun consumer เดิม)
+# และ dist (ESM JS + .d.ts สำหรับ plain Node/JS consumer) ดู docs/PACKAGE-DISTRIBUTION.md
+(cd "$root/packages/auth" && bun run build)
 out=$(cd "$root/packages/auth" && npm pack --pack-destination "$root/dist-packages" 2>/dev/null | tail -1)
 
 echo "✅ $root/dist-packages/$out"

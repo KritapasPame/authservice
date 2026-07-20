@@ -1,0 +1,16 @@
+{
+  // ใช้แค่สร้าง dist/index.d.ts (tsc --emitDeclarationOnly) — ตัว JS build จริงใช้ `bun build`
+  // (ดู package.json script "build"), ไม่ใช่ tsconfig นี้
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

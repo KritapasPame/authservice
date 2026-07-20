@@ -8,7 +8,8 @@
 ```bash
 # 1. แก้โค้ดใน packages/auth แล้ว bump version ใน packages/auth/package.json (ห้ามลืม —
 #    ชื่อไฟล์ .tgz ผูกกับ version ถ้าไม่ bump ฝั่ง consumer จะ cache ตัวเก่า)
-# 2. pack
+# 2. pack — ตั้งแต่ v1.2.0 สคริปต์รัน `bun run build` ให้อัตโนมัติก่อน pack เสมอ
+#    (สร้าง dist/index.js + dist/index.d.ts ใหม่ ไม่ต้องสั่ง build เองแยก)
 ./scripts/pack-auth.sh          # → dist-packages/platform-auth-<version>.tgz
 # 3. วางบนเซิร์ฟเวอร์
 scp dist-packages/platform-auth-<version>.tgz <server>:/var/www/packages/
@@ -106,7 +107,13 @@ app.use(requireAuth).post('/documents/:id/sign', ({ auth, set }) => {
 
 ## หมายเหตุ
 
-- tarball มีแค่ `package.json` + `src/index.ts` (คุมด้วย `files` ใน package.json)
+- ตั้งแต่ v1.2.0 tarball มี `package.json` + `src/index.ts` + `dist/` (`index.js` ESM +
+  `index.d.ts`) — คุมด้วย `files` ใน package.json. `exports` เป็น conditional:
+  consumer ที่รันด้วย **Bun** (เช่น eSign, entitlement) ได้ `src/index.ts` ตรงๆ เหมือนเดิม
+  ไม่มี build step; consumer ที่เป็น **plain Node/JS** (ไม่มี Bun/TS-aware bundler) ได้
+  `dist/index.js` + type ได้จาก `dist/index.d.ts` — ดูวิธีใช้ฝั่ง product แบบละเอียด
+  (ทั้ง Elysia และ framework อื่น) ที่ `docs/AUTH-LIB-INTEGRATION.md`
 - ตอนนี้แจกแบบนี้เพราะมี consumer เดียว — ถ้า package แชร์เพิ่มหลายตัว/หลายทีม
   ค่อยยกไป Verdaccio หรือ GitHub Packages (ดู trade-off ในบทสนทนา 2026-07-16)
-- ทดสอบ install จาก tarball แล้ว (bun add file:...tgz → import ทุก export ทำงาน)
+- ทดสอบ install จาก tarball แล้ว (bun add file:...tgz → import ทุก export ทำงาน;
+  npm install จาก plain JS/TS project → ดูผลทดสอบใน `.superpowers/sdd/auth-lib-report.md`)

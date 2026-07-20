@@ -3,4 +3,5 @@
 .superpowers/
 node_modules/
 dist-packages/
+packages/*/dist/
 secrets/*
