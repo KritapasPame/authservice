@@ -1,13 +1,16 @@
 import { test, expect } from 'bun:test'
 import { createApp } from '../src/http/app'
 
-test('GET /admin serves index.html', async () => {
+// /admin (ไม่มี slash) ต้อง redirect ไป /admin/ — ไม่งั้น relative asset ใน index.html
+// (styles.css, src/*.js) ถูก browser resolve เทียบ / แล้ว 404 ทั้งหน้า; query ต้องรอด
+// เพราะ Zitadel ส่ง ?code= กลับมาที่ /admin ตาม redirect URI ที่ลงทะเบียน
+test('GET /admin redirects to /admin/ (relative asset base) เก็บ query ครบ', async () => {
   const app = createApp()
   const res = await app.handle(new Request('http://localhost/admin'))
-  expect(res.status).toBe(200)
-  expect(res.headers.get('content-type')).toContain('text/html')
-  const body = await res.text()
-  expect(body).toContain('<title>Auth Platform Admin</title>')
+  expect(res.status).toBe(301)
+  expect(res.headers.get('location')).toBe('/admin/')
+  const res2 = await app.handle(new Request('http://localhost/admin?code=abc&state=xyz'))
+  expect(res2.headers.get('location')).toBe('/admin/?code=abc&state=xyz')
 })
 
 test('GET /admin/ (trailing slash) also serves index.html', async () => {

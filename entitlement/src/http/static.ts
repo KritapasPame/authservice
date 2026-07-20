@@ -41,6 +41,12 @@ async function serveFile(requestPath: string) {
 // priority to the more specific static/param routes already declared elsewhere (e.g.
 // adminRouter's GET /admin/overview) over this wildcard, regardless of mount order.
 export const staticRouter = new Elysia()
-  .get('/admin', () => serveIndex())
-  .get('/admin/', () => serveIndex())
-  .get('/admin/*', ({ params }) => serveFile(`/${params['*'] ?? ''}`))
+  // /admin ไม่มี slash → relative asset ใน index.html จะ resolve เทียบ / แล้ว 404 ทั้งหน้า
+  // ต้อง redirect ไป /admin/ โดยเก็บ query ไว้ (Zitadel ส่ง ?code= กลับมาที่ /admin)
+  // Elysia normalize ให้ /admin/ เข้า route นี้ด้วย — ต้องดู pathname จริงกันตัดสินใจ (กัน redirect วน)
+  .get('/admin', ({ request }) => {
+    const url = new URL(request.url)
+    return url.pathname.endsWith('/') ? serveIndex()
+      : new Response(null, { status: 301, headers: { Location: '/admin/' + url.search } })
+  })
+  .get('/admin/*', ({ params }) => params['*'] ? serveFile(`/${params['*']}`) : serveIndex())
