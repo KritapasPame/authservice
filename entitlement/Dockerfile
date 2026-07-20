@@ -10,6 +10,7 @@ RUN bun install --frozen-lockfile
 
 COPY packages ./packages
 COPY entitlement ./entitlement
+COPY admin-ui ./admin-ui
 
 WORKDIR /app/entitlement
 EXPOSE 3000
