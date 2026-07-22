@@ -8,9 +8,10 @@ import { packages, packagePermissions, permissions, tenants, companies, users, u
 // org/user id ต้อง unique ต่อ call — zitadelOrgId / zitadelUserId มี unique constraint
 let orgCounter = 0
 let userCounter = 0
+let lastCreateUserArgs: unknown[] = []
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async () => `org_mock_signup_${Date.now()}_${++orgCounter}`),
-  createZitadelUser: mock(async () => `user_mock_signup_${Date.now()}_${++userCounter}`),
+  createZitadelUser: mock(async (...a: unknown[]) => { lastCreateUserArgs = a; return `user_mock_signup_${Date.now()}_${++userCounter}` }),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
 
@@ -64,6 +65,13 @@ test('POST /signup/personal สำเร็จ → tenant type personal, members
   const grant = claims.grants[String(co.id)]
   expect(grant.roles).toEqual(['admin'])
   expect(grant.permissions).toEqual(expect.arrayContaining(['esign.document.read', 'esign.document.sign', 'tenant.user.manage']))
+})
+
+test('POST /signup/personal ส่ง password → createZitadelUser ได้รับ password (สร้าง user พร้อมรหัส atomic)', async () => {
+  const pkg = await makeSelfSignupPackage(['esign.document.read'])
+  const res = await post({ email: `signup-pw-${Date.now()}@example.com`, packageSlug: pkg.slug, password: 'Secret-123!' })
+  expect(res.status).toBe(200)
+  expect(lastCreateUserArgs[2]).toBe('Secret-123!')
 })
 
 test('POST /signup/personal ด้วย packageSlug ที่ selfSignup=false → 400 invalidPackage', async () => {

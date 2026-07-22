@@ -4,14 +4,14 @@ import { eq, and } from 'drizzle-orm'
 import { createTenant } from '../tenant/service'
 import { createZitadelUser } from '../../zitadel/client'
 
-export async function signupPersonal(i: { email: string; packageSlug: string }) {
+export async function signupPersonal(i: { email: string; packageSlug: string; password?: string }) {
   const [pkg] = await db.select().from(packages).where(and(eq(packages.slug, i.packageSlug), eq(packages.selfSignup, true)))
   if (!pkg) throw { invalidPackage: i.packageSlug }
   if ((await db.select().from(users).where(eq(users.email, i.email))).length) throw { emailTaken: i.email }
   const t = await createTenant({ name: i.email, slug: 'p-' + crypto.randomUUID().slice(0, 8) })
   await db.update(tenants).set({ packageId: pkg.id, type: 'personal' }).where(eq(tenants.id, t.id))
   const [co] = await db.insert(companies).values({ tenantId: t.id, name: i.email }).returning()
-  const zid = await createZitadelUser(t.zitadelOrgId, i.email)
+  const zid = await createZitadelUser(t.zitadelOrgId, i.email, i.password)
   const [u] = await db.insert(users).values({ zitadelUserId: zid, tenantId: t.id, email: i.email }).returning()
   await db.insert(userCompanies).values({ userId: u.id, companyId: co.id, isAdmin: true })   // เจ้าของ space ตัวเอง → resolver เดินเส้น admin ปกติ
   const mods = await db.selectDistinct({ moduleId: permissions.moduleId }).from(packagePermissions)

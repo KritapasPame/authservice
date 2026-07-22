@@ -10,4 +10,4 @@ export const signupRouter = new Elysia({ prefix: '/signup' })
       if (e?.emailTaken) { set.status = 409; return { emailTaken: e.emailTaken } }
       throw e
     }
-  }, { body: t.Object({ email: t.String({ format: 'email' }), packageSlug: t.String() }) })
+  }, { body: t.Object({ email: t.String({ format: 'email' }), packageSlug: t.String(), password: t.Optional(t.String({ minLength: 8 })) }) })
