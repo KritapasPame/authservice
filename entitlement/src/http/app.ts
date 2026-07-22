@@ -9,6 +9,7 @@ import { invoiceRouter } from '../modules/invoice/route'
 import { claimsRouter } from '../claims/route'
 import { zitadelClaimsRouter } from '../claims/zitadel-route'
 import { adminRouter } from '../modules/admin/route'
+import { meRouter } from '../modules/me/route'
 import { signupRouter } from '../modules/signup/route'
 import { staticRouter } from './static'
 
@@ -51,5 +52,6 @@ export function createApp() {
     .use(zitadelClaimsRouter)
     .use(adminRouter)
     .use(signupRouter)
+    .use(meRouter)
     .use(staticRouter) // GET /admin, /admin/* — serves admin-ui/ (see static.ts)
 }
