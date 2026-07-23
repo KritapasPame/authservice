@@ -8,6 +8,7 @@ export const signupRouter = new Elysia({ prefix: '/signup' })
     catch (e: any) {
       if (e?.invalidPackage) { set.status = 400; return { invalidPackage: e.invalidPackage } }
       if (e?.emailTaken) { set.status = 409; return { emailTaken: e.emailTaken } }
+      if (e?.weakPassword) { set.status = 400; return { weakPassword: true } }
       throw e
     }
   }, { body: t.Object({ email: t.String({ format: 'email' }), packageSlug: t.String(), password: t.Optional(t.String({ minLength: 8 })) }) })

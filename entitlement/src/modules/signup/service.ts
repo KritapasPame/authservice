@@ -18,6 +18,7 @@ export async function signupPersonal(i: { email: string; packageSlug: string; pa
     await db.delete(tenants).where(eq(tenants.id, t.id))
     await Promise.resolve(deleteZitadelOrg(t.zitadelOrgId)).catch(() => {})
     if (String(e?.message).includes(' 409 ')) throw { emailTaken: i.email }
+    if (/password/i.test(String(e?.message))) throw { weakPassword: true }   // Zitadel password complexity policy
     throw e
   })
   const [u] = await db.insert(users).values({ zitadelUserId: zid, tenantId: t.id, email: i.email }).returning()

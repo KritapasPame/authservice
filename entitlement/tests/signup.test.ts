@@ -109,6 +109,19 @@ test('email ซ้ำใน Zitadel (แต่ไม่มีใน DB เรา
   expect(deletedOrgIds.length).toBeGreaterThan(0)
 })
 
+test('password ไม่ผ่าน policy ของ Zitadel → 400 weakPassword + rollback', async () => {
+  const pkg = await makeSelfSignupPackage([])
+  const email = `signup-weakpw-${Date.now()}@example.com`
+  nextCreateUserError = new Error('zitadel /v2/users/human 400 {"code":3,"message":"Password must contain upper case (COMMA-VoaRj)"}')
+
+  const res = await post({ email, packageSlug: pkg.slug, password: 'aaaabbbb' })
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ weakPassword: true })
+
+  const orphan = await db.select().from(tenants).where(eq(tenants.name, email))
+  expect(orphan.length).toBe(0)
+})
+
 test('Zitadel พังด้วย error อื่น → error เดิมหลุดออกไป (ไม่ swallow) + rollback เหมือนกัน', async () => {
   const pkg = await makeSelfSignupPackage([])
   const email = `signup-zerr-${Date.now()}@example.com`
