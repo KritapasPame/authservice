@@ -9,9 +9,15 @@ import { packages, packagePermissions, permissions, tenants, companies, users, u
 let orgCounter = 0
 let userCounter = 0
 let lastCreateUserArgs: unknown[] = []
+let nextCreateUserError: Error | null = null   // ตั้งค่าให้ createZitadelUser ครั้งถัดไปพัง (จำลอง Zitadel error)
+let deletedOrgIds: string[] = []
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async () => `org_mock_signup_${Date.now()}_${++orgCounter}`),
-  createZitadelUser: mock(async (...a: unknown[]) => { lastCreateUserArgs = a; return `user_mock_signup_${Date.now()}_${++userCounter}` }),
+  createZitadelUser: mock(async (...a: unknown[]) => {
+    if (nextCreateUserError) { const e = nextCreateUserError; nextCreateUserError = null; throw e }
+    lastCreateUserArgs = a; return `user_mock_signup_${Date.now()}_${++userCounter}`
+  }),
+  deleteZitadelOrg: mock(async (orgId: string) => { deletedOrgIds.push(orgId) }),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
 
@@ -86,6 +92,35 @@ test('POST /signup/personal ด้วย packageSlug ที่ไม่มีจ
   const res = await post({ email: `signup-none-${Date.now()}@example.com`, packageSlug: 'no-such-package-slug' })
   expect(res.status).toBe(400)
   expect(await res.json()).toEqual({ invalidPackage: 'no-such-package-slug' })
+})
+
+test('email ซ้ำใน Zitadel (แต่ไม่มีใน DB เรา) → 409 emailTaken + rollback tenant/company/org ไม่ทิ้งขยะ', async () => {
+  const pkg = await makeSelfSignupPackage([])
+  const email = `signup-zdup-${Date.now()}@example.com`
+  nextCreateUserError = new Error('zitadel /v2/users/human 409 {"message":"User already exists (COMMAND-k2unb)"}')
+
+  const res = await post({ email, packageSlug: pkg.slug })
+  expect(res.status).toBe(409)
+  expect(await res.json()).toEqual({ emailTaken: email })
+
+  // ไม่มี tenant กำพร้า (สร้างด้วย name = email) และ org ที่สร้างไปแล้วถูกลบ
+  const orphan = await db.select().from(tenants).where(eq(tenants.name, email))
+  expect(orphan.length).toBe(0)
+  expect(deletedOrgIds.length).toBeGreaterThan(0)
+})
+
+test('Zitadel พังด้วย error อื่น → error เดิมหลุดออกไป (ไม่ swallow) + rollback เหมือนกัน', async () => {
+  const pkg = await makeSelfSignupPackage([])
+  const email = `signup-zerr-${Date.now()}@example.com`
+  deletedOrgIds = []
+  nextCreateUserError = new Error('zitadel /v2/users/human 500 internal')
+
+  const res = await post({ email, packageSlug: pkg.slug })
+  expect(res.status).toBeGreaterThanOrEqual(500)
+
+  const orphan = await db.select().from(tenants).where(eq(tenants.name, email))
+  expect(orphan.length).toBe(0)
+  expect(deletedOrgIds.length).toBe(1)
 })
 
 test('POST /signup/personal อีเมลซ้ำ → 409 emailTaken', async () => {

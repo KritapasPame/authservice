@@ -14,6 +14,7 @@ let zCounter = 0
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async (_name: string) => 'org_mock_e2e_' + Date.now()),
   createZitadelUser: mock(async () => `user_mock_e2e_${Date.now()}_${++zCounter}`),
+  deleteZitadelOrg: mock(async () => {}),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
 

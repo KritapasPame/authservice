@@ -9,6 +9,7 @@ import { tenants, companies, users, userCompanies, userPermissions, permissions,
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async () => 'org_mock_' + Date.now()),
   createZitadelUser: mock(async () => 'user_mock_perm_' + Date.now()),
+  deleteZitadelOrg: mock(async () => {}),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
 

@@ -6,6 +6,10 @@ const call = (path: string, body: unknown) => fetch(env.ZITADEL_MGMT_URL + path,
 }).then(async r => { if (!r.ok) throw new Error(`zitadel ${path} ${r.status} ${await r.text()}`); return r.json() })
 
 export const createZitadelOrg = (name: string) => call('/v2/organizations', { name }).then((r: any) => r.organizationId)
+// ใช้ rollback ตอน signup พังกลางทาง — best-effort
+export const deleteZitadelOrg = (orgId: string) => fetch(`${env.ZITADEL_MGMT_URL}/v2/organizations/${orgId}`, {
+  method: 'DELETE', headers: { authorization: `Bearer ${env.ZITADEL_MGMT_TOKEN}` },
+})
 export const createZitadelUser = (orgId: string, email: string, password?: string) =>
   // profile เป็น field บังคับของ AddHumanUser — ยังไม่มีชื่อจริงตอน invite ใช้ email local-part ไปก่อน user แก้เองทีหลังได้
   // isVerified: true — invite flow แอดมินกรอก email เอง (ไม่มี SMTP บน pretest ด้วย); self-signup ในอนาคตต้อง verify จริงใน flow ตัวเอง

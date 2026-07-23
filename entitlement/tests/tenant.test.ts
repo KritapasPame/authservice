@@ -10,6 +10,7 @@ const createZitadelOrgMock = mock(async (_name: string) => orgId)
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: createZitadelOrgMock,
   createZitadelUser: mock(async () => 'user_mock'),
+  deleteZitadelOrg: mock(async () => {}),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
 

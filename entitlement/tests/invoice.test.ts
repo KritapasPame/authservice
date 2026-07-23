@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm'
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async () => 'org_mock_' + Date.now()),
   createZitadelUser: mock(async () => 'user_mock'),
+  deleteZitadelOrg: mock(async () => {}),
   listLoginEvents: mock(async () => ({ events: [] })),
 }))
 

@@ -12,6 +12,7 @@ const mockEvents = { events: [{ type: 'user.token.added', userId: 'z-mock', crea
 mock.module('../src/zitadel/client', () => ({
   createZitadelOrg: mock(async (_name: string) => 'org_mock_' + Date.now()),
   createZitadelUser: mock(async () => 'user_mock'),
+  deleteZitadelOrg: mock(async () => {}),
   listLoginEvents: mock(async () => mockEvents),
 }))
 
