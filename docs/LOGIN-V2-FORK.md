@@ -2,7 +2,8 @@
 
 > อัปเดต: 2026-07-17
 > Fork: `github.com/KritapasPame/zitadel` branch **`custom-login`** (base tag **v4.16.0** = ตรงกับ Zitadel server)
-> Local clone: `../zitadel-login-fork` (sibling ของ authservice)
+> Local clone (dev): `~/Workspaces/kritapas/zitadel-login-fork` (sibling ของ authservice)
+> Path บน pre-test server: **`/opt/zitadel-login-fork`**
 > Image: **`edm/zitadel-login:v4.16.0`**
 
 ทำไม fork: ต้องการ login UI หน้าตาของเราเอง (Figma mockup) — `apps/login/` เป็น **MIT**
@@ -20,6 +21,8 @@
 | `apps/login/src/components/edm-login-form.tsx` | **เรา** | ฟอร์มรวม loginname+password |
 | `apps/login/src/app/(login)/layout.tsx` | upstream | แตะ **1 บรรทัด** (import edm-brand.scss) |
 | `apps/login/src/app/(login)/loginname/page.tsx` | upstream | แตะ ~4 บรรทัด (สลับ `UsernameForm` → `EdmLoginForm`) |
+| `apps/login/Dockerfile.edm` | **เรา** | build ครบจบในตัว (ดู §4 ว่าทำไมไม่ใช้ `nx pack`) |
+| `.dockerignore` (repo root) | **เรา** | กัน secret/ของหนักออกจาก build context |
 
 รวมแตะ upstream **~5 บรรทัด** — เช็คได้ด้วย `git diff --stat`
 
@@ -75,14 +78,99 @@ NEXT_PUBLIC_THEME_APPEARANCE=material
 
 ## 4. Build image
 
+> ❗ **ใช้ `apps/login/Dockerfile.edm` เท่านั้น — อย่าใช้ `nx pack`**
+
 ```bash
 cd ../zitadel-login-fork
-pnpm exec nx pack @zitadel/login                                  # → zitadel/zitadel-login:local
-docker tag zitadel/zitadel-login:local edm/zitadel-login:v4.16.0  # retag ให้ชัดว่าไม่ใช่ official
+docker build -f apps/login/Dockerfile.edm -t edm/zitadel-login:v4.16.0 .   # context = repo root
 ```
 
+### ทำไมห้ามใช้ `nx pack` (upstream)
+
+`nx pack` → `apps/login/Dockerfile` ซึ่ง **COPY `.next/standalone` ที่ build จาก host เข้ามา**
+→ build บน Mac แล้วได้ **binary ของ macOS** ติดไปใน image linux:
+
+```
+.next/standalone/node_modules/.pnpm/@img+sharp-darwin-arm64@0.34.5/...   ❌
+```
+
+อาการบน server: `The requested image's platform (linux/arm64) does not match
+the detected host platform (linux/amd64/v3)` — และใส่ `--platform linux/amd64` **ก็ไม่ช่วย**
+เพราะ binary ข้างในยังเป็น darwin อยู่ดี
+
+`Dockerfile.edm` build **ข้างใน container** → deps ตรง arch เป้าหมายเสมอ:
+
+| build ด้วย | sharp ที่ได้ |
+|-----------|-------------|
+| `nx pack` บน Mac | `@img+sharp-darwin-arm64` ❌ |
+| `Dockerfile.edm` | `@img+sharp-linuxmusl-<arch>` ✅ |
+
+### ข้าม arch จากเครื่อง Mac (ช้า — qemu emulation)
+
+```bash
+docker buildx build --platform linux/amd64 -f apps/login/Dockerfile.edm \
+  -t edm/zitadel-login:v4.16.0 --load .
+```
+> Colima บน Apple Silicon = arm64 → amd64 ต้อง emulate **ช้ามาก** แนะนำ build บน server แทน (§5.1)
+
+### กับดักตอน build (เจอมาแล้วบน server)
+
+| อาการ | สาเหตุ | แก้ |
+|-------|--------|-----|
+| `exec /app/entrypoint.sh: exec format error` | รัน image **arm64** บนเครื่อง amd64 (เผลอ `docker save\|load` จาก Mac) | build บน server, ยืนยันด้วย `docker image inspect ... --format '{{.Architecture}}'` ต้องได้ `amd64`; ลบ image เก่าก่อน `docker rmi -f` |
+| `Corepack ... Error: EAI_AGAIN` ตอน `nx build` | repo มี `packageManager` 2 เวอร์ชัน (root `10.30.3`, `apps/login` `10.28.2`) → corepack โหลด pnpm ใหม่กลางคัน | Dockerfile.edm ใช้ `npm i -g pnpm` + `COREPACK_ENABLE_STRICT=0` แทน corepack (แก้แล้ว) |
+| `EAI_AGAIN registry.npmjs.org` ตอน `pnpm install` (โหลดไปเกือบครบแล้วตาย) | **musl (Alpine)** — ดู "ทำไมต้อง slim" ข้างล่าง | ใช้ base `node:24-slim` (glibc) + `--network-concurrency=4` (แก้แล้ว) |
+| `x509: certificate signed by unknown authority` ตอน `buf generate` | `node:*-slim` **ไม่มี `ca-certificates`** ติดมา (alpine มี) | `apt-get install ca-certificates` — ต้องลง **ทั้ง builder และ runtime** (runtime ก็ใช้ `SSL_CERT_FILE`) (แก้แล้ว) |
+
+### ทำไมต้อง `node:24-slim` ไม่ใช่ `-alpine`
+
+**อาการ:** `pnpm install` โหลดสำเร็จ **2158 จาก 2160** package แล้วตายที่ตัวท้าย โดย
+`EAI_AGAIN` โผล่กระปริดกระปรอยตลอดทาง — ขณะที่ `docker pull` / `apt` บนเครื่องเดียวกันปกติดี
+
+**ทำไมมีแค่ build นี้ที่พัง** — คำนวณจากหลักฐาน: 2158/2160 → อัตราพลาดต่อ lookup ≈ **0.05%**
+
+| งาน | DNS lookup | โอกาสสำเร็จ |
+|------|-----------|-------------|
+| `docker pull` | ~1 | 99.95% (ไม่มีทางสังเกตเห็น) |
+| `pnpm install` (2160 pkg) | หลายพัน | **~34%** → พัง 2 ใน 3 ครั้ง |
+
+→ **DNS ของ server ไม่ได้พัง** มันดี 99.95% (monitoring บอก healthy) แต่แพ้ทางสถิติเมื่อยิงหลายพันครั้ง
+**อย่าไปไล่แก้ DNS server — ผิดทาง**
+
+**ต้นเหตุจริง = musl ของ Alpine:**
+- musl ยิง **A + AAAA query ขนานกัน** จาก UDP socket เดียว
+- ตั้งแต่ [musl commit `5cf1ac24`](https://git.musl-libc.org/cgit/musl/commit/src/network/lookup_name.c?id=5cf1ac2443ad0dba263559a3fe043d929e0e5c4c) (2020) — **ถ้าตัวใดตัวหนึ่ง fail = ทั้ง lookup พังเป็น `EAI_AGAIN`** แม้อีกตัวจะสำเร็จ
+- musl **ใช้ `single-request-reopen` ไม่ได้** (ทางแก้มาตรฐานของ glibc) — [musl wiki](https://wiki.musl-libc.org/functional-differences-from-glibc.html)
+- แพ็กเก็ตหายเป็นครั้งคราวจาก conntrack NAT race บน bridge network ([k8s#56903](https://github.com/kubernetes/kubernetes/issues/56903))
+
+glibc ทน scenario เดียวกันได้ → เปลี่ยน base = แก้ที่ต้นเหตุ (แลกกับ image ใหญ่ขึ้น ~130MB)
+
+> **โบนัส:** `sharp` บน Alpine ต้อง rebuild เอง ([sharp docs](https://sharp.pixelplumbing.com/install/)) — ใช้ glibc แล้วหมดปัญหานี้ด้วย
+
+**⚠️ 2 อย่างที่อย่าทำ (เคยแนะนำผิด):**
+- **`docker build --network=host`** — BuildKit driver แบบ container อ่าน host resolv.conf ไม่เจอ แล้ว
+  **fallback ไป `8.8.8.8` เงียบๆ** ([moby/buildkit#5009](https://github.com/moby/buildkit/issues/5009)) ถ้า firewall บล็อก = แย่กว่าเดิม
+- **แก้ `/etc/docker/daemon.json` ใส่ DNS** — ไม่ใช่ต้นเหตุ และ **ไม่ propagate ไป BuildKit worker**
+  แบบ `docker-container` ([moby/buildkit#734](https://github.com/moby/buildkit/issues/734))
+
+> เกร็ด: pnpm ≥10.24 สเกล network-concurrency อัตโนมัติ **16→64** ตามจำนวน worker
+> ([pnpm 10.24](https://pnpm.io/blog/releases/10.24)) — บนเครื่อง core เยอะยิ่งยิงหนัก จึงล็อกไว้ที่ 4
+
+> เกร็ด 2: ข้อมูลที่ว่า "Docker embedded DNS จำกัด 100 concurrent" เป็น**ข้อมูลเก่า** —
+> ปัจจุบัน `maxConcurrent = 1024` ตั้งแต่ Docker 24.0 ([moby PR#44664](https://github.com/moby/moby/pull/44664)) สูงกว่า pnpm มาก
+
+> 💡 ทดสอบ Dockerfile ต้องใช้ `--no-cache` เสมอ — ไม่งั้นเครื่อง dev ที่ cache ไว้แล้วจะไม่เจอบั๊กที่ server (เครื่องสะอาด) เจอ
+
+### หมายเหตุ build
+
+- ต้องมี **เน็ต** ตอน build (`buf generate` ดึง proto deps ตาม `proto/buf.lock`)
 - `NEXT_PUBLIC_*` (theme) ถูก **inline ตอน build** → เปลี่ยน theme = ต้อง rebuild
-- `ZITADEL_SERVICE_USER_TOKEN` เป็น server-side → **ไม่ถูกอบเข้า image** (verify แล้วด้วย `grep` ทั้ง image ไม่เจอ)
+  (ส่งตอน runtime ไม่มีผลกับ client bundle) — ปรับผ่าน `--build-arg` ได้:
+  ```bash
+  docker build -f apps/login/Dockerfile.edm --build-arg NEXT_PUBLIC_THEME_ROUNDNESS=full ...
+  ```
+- `.dockerignore` กัน `.env.local` / `login-client.pat` ออกจาก build context → **PAT ไม่มีทางเข้า image**
+  (verify แล้ว: `grep` ทั้ง image ไม่เจอ token)
 
 ---
 
@@ -91,21 +179,57 @@ docker tag zitadel/zitadel-login:local edm/zitadel-login:v4.16.0  # retag ให
 Topology: Cloudflare Tunnel → `10.7.219.156:443` → nginx (TLS) → `zitadel:8080` / `login:3000`
 (ดู [PRETEST-AUTH-DEPLOYMENT.md](PRETEST-AUTH-DEPLOYMENT.md))
 
-### 5.1 ส่ง image ขึ้นเครื่อง
+### 5.1 เอา image ขึ้นเครื่อง — **build บน server (แนะนำ)**
 
-**วิธี A — docker save/load ผ่าน ssh** (ง่ายสุด อยู่ LAN เดียวกัน ไม่ต้องมี registry):
+server เป็น **amd64 native** → build ที่นั่นเร็วและถูก arch, ส่งแค่ ~160MB (gzip, LAN)
+และ **โค้ดเราไม่ต้อง push ขึ้น fork สาธารณะ**
+
+> **path บน server: `/opt/zitadel-login-fork`** (project รวมอยู่ใต้ `/opt` ทั้งหมด)
+> เข้ากับคอมเมนต์ใน `docker-compose.yml` (`../zitadel-login-fork`) พอดี ถ้า authservice อยู่ `/opt/authservice`
+
+> ❗ **server ไม่มี `rsync`** → ใช้ **tar over ssh** (ต้องการแค่ `ssh` + `tar`)
+> ❗ **อย่า `sudo tar xzf -`** — stdin ถูก tarball ยึด sudo ขอ password ไม่ได้ → สร้าง dir + chown ก่อน
+
 ```bash
-docker save edm/zitadel-login:v4.16.0 | gzip | \
-  ssh <user>@10.7.219.156 'gunzip | docker load'
+# 1) เตรียม dir (แยก step ให้ sudo ขอ password ได้)
+ssh <user>@10.7.219.156 'sudo mkdir -p /opt/zitadel-login-fork && sudo chown $(whoami) /opt/zitadel-login-fork'
+
+# 2) ส่ง source
+cd ~/Workspaces/kritapas/zitadel-login-fork
+tar czf - \
+  --exclude='./.git' \
+  --exclude='./node_modules' \
+  --exclude='*/node_modules' \
+  --exclude='*/.next' \
+  --exclude='./.nx' \
+  --exclude='*/.env.local' \
+  --exclude='./login-client.pat' \
+  . | ssh <user>@10.7.219.156 'tar xzf - -C /opt/zitadel-login-fork'
+
+# 3) build บน server (มีแค่ docker ก็พอ ไม่ต้องลง node/pnpm — ต้องมีเน็ต)
+ssh <user>@10.7.219.156 'cd /opt/zitadel-login-fork && docker build -f apps/login/Dockerfile.edm -t edm/zitadel-login:v4.16.0 .'
 ```
 
-**วิธี B — ghcr.io** (ดีกว่าถ้า deploy บ่อย):
+ถ้า user ไม่มีสิทธิ์ sudo → ส่งไป `~/` ก่อนแล้วย้าย:
 ```bash
-docker tag edm/zitadel-login:v4.16.0 ghcr.io/kritapaspame/zitadel-login:v4.16.0
-echo $GITHUB_TOKEN | docker login ghcr.io -u KritapasPame --password-stdin
-docker push ghcr.io/kritapaspame/zitadel-login:v4.16.0
-# บนเครื่อง: docker login ghcr.io && docker pull ... (+ แก้ image ใน compose)
+tar czf - ... . | ssh <user>@10.7.219.156 'mkdir -p ~/zlf && tar xzf - -C ~/zlf'
+ssh <user>@10.7.219.156 'sudo mv ~/zlf /opt/zitadel-login-fork'
 ```
+
+> ตรวจแล้วว่า tar นี้: **ไม่มี** `.env.local`/`login-client.pat` (PAT ปลอดภัย), ไม่มี `node_modules`/`.git`/`.next`
+> และ **มี** `Dockerfile.edm`, `.dockerignore`, `edm-*`, `pnpm-lock.yaml`, `proto/buf.lock` ครบ (11,320 ไฟล์)
+
+**ทางเลือกอื่น:**
+
+| วิธี | ข้อดี | ข้อเสีย |
+|------|-------|---------|
+| `docker save \| ssh docker load` | ไม่ต้อง build ที่ server | ต้อง build amd64 บน Mac ก่อน = qemu **ช้ามาก** |
+| ghcr.io push/pull | ดีถ้า deploy บ่อย | ต้อง build amd64 ก่อนเหมือนกัน + ต้อง login registry 2 ฝั่ง |
+
+> ⚠️ **fork `KritapasPame/zitadel` เป็น public** (fork ของ repo public บังคับ public)
+> ถ้า push custom UI ขึ้นไป = เปิดเผยต่อสาธารณะ ทั้งที่ MIT ให้สิทธิ์เก็บ private ได้
+> อยากเก็บ private → สร้าง repo **private** แยก แล้ว `git remote add upstream https://github.com/zitadel/zitadel.git` เอง
+> (ไม่ใช่กดปุ่ม Fork) — ตอนนี้ **ยังไม่ได้ push อะไรขึ้น fork**
 
 ### 5.2 ตั้ง env บนเครื่อง (`authservice/.env` ของ **server**)
 
