@@ -19,6 +19,8 @@ const PERMISSIONS = [
   { key: 'esign.document.send', moduleKey: 'esign' },
   { key: 'esign.template.manage', moduleKey: 'esign' },
   { key: 'esign.audit.report', moduleKey: 'esign' },
+  { key: 'esign.document.void', moduleKey: 'esign' },
+  { key: 'esign.folder.manage', moduleKey: 'esign' },
 ]
 
 // idempotent — เรียกซ้ำได้ ไม่แตะ row เดิม
